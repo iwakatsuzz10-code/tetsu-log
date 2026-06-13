@@ -115,13 +115,43 @@ const EXERCISES = {
   "体幹": ["プランク", "クランチ", "レッグレイズ", "アブローラー"],
 };
 
+const EXERCISE_META = {
+  "ベンチプレス": { mode: "weighted", start: { weight: 40, reps: 10 }, unit: "kg x 回" },
+  "ダンベルプレス": { mode: "weighted", start: { weight: 12, reps: 10 }, unit: "kg x 回" },
+  "インクラインプレス": { mode: "weighted", start: { weight: 30, reps: 10 }, unit: "kg x 回" },
+  "チェストフライ": { mode: "weighted", start: { weight: 20, reps: 12 }, unit: "kg x 回" },
+  "腕立て伏せ": { mode: "reps", start: { reps: 12 }, unit: "回" },
+  "デッドリフト": { mode: "weighted", start: { weight: 60, reps: 8 }, unit: "kg x 回" },
+  "ラットプルダウン": { mode: "weighted", start: { weight: 35, reps: 10 }, unit: "kg x 回" },
+  "懸垂": { mode: "reps", start: { reps: 6 }, unit: "回" },
+  "ベントオーバーロウ": { mode: "weighted", start: { weight: 35, reps: 10 }, unit: "kg x 回" },
+  "シーテッドロウ": { mode: "weighted", start: { weight: 35, reps: 10 }, unit: "kg x 回" },
+  "スクワット": { mode: "weighted", start: { weight: 50, reps: 10 }, unit: "kg x 回" },
+  "レッグプレス": { mode: "weighted", start: { weight: 80, reps: 10 }, unit: "kg x 回" },
+  "ランジ": { mode: "reps", start: { reps: 10 }, unit: "回/脚" },
+  "レッグカール": { mode: "weighted", start: { weight: 25, reps: 12 }, unit: "kg x 回" },
+  "カーフレイズ": { mode: "weighted", start: { weight: 30, reps: 15 }, unit: "kg x 回" },
+  "ショルダープレス": { mode: "weighted", start: { weight: 20, reps: 10 }, unit: "kg x 回" },
+  "サイドレイズ": { mode: "weighted", start: { weight: 6, reps: 12 }, unit: "kg x 回" },
+  "リアレイズ": { mode: "weighted", start: { weight: 5, reps: 12 }, unit: "kg x 回" },
+  "アップライトロウ": { mode: "weighted", start: { weight: 20, reps: 10 }, unit: "kg x 回" },
+  "アームカール": { mode: "weighted", start: { weight: 10, reps: 10 }, unit: "kg x 回" },
+  "ハンマーカール": { mode: "weighted", start: { weight: 10, reps: 10 }, unit: "kg x 回" },
+  "トライセプスエクステンション": { mode: "weighted", start: { weight: 12, reps: 10 }, unit: "kg x 回" },
+  "ディップス": { mode: "reps", start: { reps: 8 }, unit: "回" },
+  "プランク": { mode: "timed", start: { seconds: 60 }, unit: "秒" },
+  "クランチ": { mode: "reps", start: { reps: 15 }, unit: "回" },
+  "レッグレイズ": { mode: "reps", start: { reps: 12 }, unit: "回" },
+  "アブローラー": { mode: "reps", start: { reps: 8 }, unit: "回" },
+};
+
 const BADGES = [
   { id: "first", name: "はじめの一歩", desc: "初めて記録した", icon: "🔥", check: (d) => totalLogs(d) >= 1 },
   { id: "streak3", name: "三日坊主卒業", desc: "3日連続で記録", icon: "🗓️", check: (d) => calcStreak(d) >= 3 },
   { id: "streak7", name: "週間皆勤", desc: "7日連続で記録", icon: "📅", check: (d) => calcStreak(d) >= 7 },
   { id: "streak30", name: "鉄の習慣", desc: "30日連続で記録", icon: "⛓️", check: (d) => calcStreak(d) >= 30 },
-  { id: "vol10k", name: "10トン超え", desc: "総挙上量 10,000kg", icon: "🏋️", check: (d) => totalVolume(d) >= 10000 },
-  { id: "vol100k", name: "100トンの男", desc: "総挙上量 100,000kg", icon: "🚛", check: (d) => totalVolume(d) >= 100000 },
+  { id: "vol10k", name: "重量10,000kg", desc: "重量系種目の累計", icon: "🏋️", check: (d) => totalVolume(d) >= 10000 },
+  { id: "vol100k", name: "重量100,000kg", desc: "重量系種目の累計", icon: "🚛", check: (d) => totalVolume(d) >= 100000 },
   { id: "w10", name: "計量の鬼", desc: "体重を10回記録", icon: "⚖️", check: (d) => d.weights.length >= 10 },
   { id: "w50", name: "体重マスター", desc: "体重を50回記録", icon: "📊", check: (d) => d.weights.length >= 50 },
   { id: "photo1", name: "ライン記録開始", desc: "体の写真を初めて保存", icon: "📷", check: (d) => (d.photos?.length || 0) >= 1 },
@@ -154,7 +184,42 @@ function levelFromXp(xp) {
 }
 const titleForLevel = (lv) => LEVEL_TITLES[Math.min(lv - 1, LEVEL_TITLES.length - 1)];
 const totalLogs = (d) => d.weights.length + d.workouts.length + (d.photos?.length || 0);
-const totalVolume = (d) => d.workouts.reduce((s, w) => s + w.volume, 0);
+const exerciseMeta = (name) => EXERCISE_META[name] || { mode: "weighted", start: { weight: 40, reps: 10 }, unit: "kg x 回" };
+const normalizeSet = (set, mode) => {
+  if (mode === "timed") return { seconds: set.seconds ?? 60 };
+  if (mode === "reps") return { reps: set.reps ?? 10 };
+  return { weight: set.weight ?? 40, reps: set.reps ?? 10 };
+};
+const defaultSetFor = (exercise) => ({ ...exerciseMeta(exercise).start });
+const weightedVolume = (workout) => {
+  const mode = workout.mode || exerciseMeta(workout.exercise).mode;
+  if (mode !== "weighted") return 0;
+  return workout.sets.reduce((s, x) => s + (x.weight || 0) * (x.reps || 0), 0);
+};
+const totalVolume = (d) => d.workouts.reduce((s, w) => s + weightedVolume(w), 0);
+const totalSets = (workouts) => workouts.reduce((s, w) => s + w.sets.length, 0);
+const formatSeconds = (sec) => sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${sec}`;
+const formatSet = (set, mode) => {
+  if (mode === "timed") return `${formatSeconds(set.seconds || 0)}秒`;
+  if (mode === "reps") return `${set.reps || 0}回`;
+  return `${set.weight || 0}kg×${set.reps || 0}`;
+};
+const formatWorkoutSets = (workout) => {
+  const mode = workout.mode || exerciseMeta(workout.exercise).mode;
+  return workout.sets.map((s) => formatSet(s, mode)).join(" / ");
+};
+const workoutPrimaryMetric = (workout) => {
+  const mode = workout.mode || exerciseMeta(workout.exercise).mode;
+  if (mode === "timed") {
+    const sec = workout.sets.reduce((s, x) => s + (x.seconds || 0), 0);
+    return { value: formatSeconds(sec), suffix: "秒", label: "保持時間" };
+  }
+  if (mode === "reps") {
+    const reps = workout.sets.reduce((s, x) => s + (x.reps || 0), 0);
+    return { value: reps.toLocaleString(), suffix: "回", label: "総回数" };
+  }
+  return { value: weightedVolume(workout).toLocaleString(), suffix: "kg", label: "重量ボリューム" };
+};
 
 function calcStreak(d) {
   const dates = new Set([...d.weights.map((w) => w.date), ...d.workouts.map((w) => w.date), ...(d.photos || []).map((p) => p.date)]);
@@ -180,7 +245,8 @@ function todaySummary(data) {
   return {
     weight: data.weights.find((w) => w.date === today),
     workouts,
-    volume: workouts.reduce((s, w) => s + w.volume, 0),
+    volume: workouts.reduce((s, w) => s + weightedVolume(w), 0),
+    sets: totalSets(workouts),
     photo: (data.photos || []).find((p) => p.date === today),
   };
 }
@@ -416,7 +482,7 @@ function TetsuLog() {
 /* ================= HOME ================= */
 
 function HomeTab({ data, lv, goTab }) {
-  const { weight: todayWeight, workouts: todayWorkouts, volume: todayVolume, photo: todayPhoto } = todaySummary(data);
+  const { weight: todayWeight, workouts: todayWorkouts, sets: todaySets, photo: todayPhoto } = todaySummary(data);
   const latestWeight = data.weights.length ? data.weights[data.weights.length - 1] : null;
   const goal = data.profile.goalWeight;
   const completed = [todayWeight, todayWorkouts.length > 0, todayPhoto].filter(Boolean).length;
@@ -446,12 +512,12 @@ function HomeTab({ data, lv, goTab }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Panel onClick={() => goTab("workout")} style={{ cursor: "pointer" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.ember, fontSize: 12, fontWeight: 800 }}>
-            <Dumbbell size={15} /> 今日の挙上量
+            <Dumbbell size={15} /> 今日のトレ
           </div>
           <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 34, fontWeight: 600, marginTop: 8 }}>
-            {todayVolume.toLocaleString()}<span style={{ fontSize: 13, color: C.inkSub, marginLeft: 4 }}>kg</span>
+            {todayWorkouts.length}<span style={{ fontSize: 13, color: C.inkSub, marginLeft: 4 }}>種目</span>
           </div>
-          <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>{todayWorkouts.length} 種目</div>
+          <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>{todaySets} セット</div>
         </Panel>
         <Panel onClick={() => goTab("weight")} style={{ cursor: "pointer" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.jade, fontSize: 12, fontWeight: 800 }}>
@@ -469,7 +535,7 @@ function HomeTab({ data, lv, goTab }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {[
             { ok: !!todayWeight, label: "体重", sub: todayWeight ? `${todayWeight.kg.toFixed(1)}kg` : "未記録", icon: Scale, tab: "weight", color: C.jade },
-            { ok: todayWorkouts.length > 0, label: "筋トレ", sub: todayWorkouts.length ? `${todayVolume.toLocaleString()}kg` : "未記録", icon: Dumbbell, tab: "workout", color: C.ember },
+            { ok: todayWorkouts.length > 0, label: "筋トレ", sub: todayWorkouts.length ? `${todayWorkouts.length}種目/${todaySets}セット` : "未記録", icon: Dumbbell, tab: "workout", color: C.ember },
             { ok: !!todayPhoto, label: "写真", sub: todayPhoto ? "保存済み" : "未保存", icon: Camera, tab: "photos", color: C.violet },
           ].map((item) => {
             const Icon = item.icon;
@@ -514,9 +580,12 @@ function HomeTab({ data, lv, goTab }) {
                 <div>
                   <span style={{ fontSize: 11, color: C.ember, fontWeight: 800, marginRight: 8 }}>{w.muscle}</span>
                   <span style={{ fontWeight: 700 }}>{w.exercise}</span>
-                  <div style={{ fontSize: 12, color: C.inkSub, marginTop: 2 }}>{w.sets.map((s) => `${s.weight}kg×${s.reps}`).join(" / ")}</div>
+                  <div style={{ fontSize: 12, color: C.inkSub, marginTop: 2 }}>{formatWorkoutSets(w)}</div>
                 </div>
-                <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 600, color: C.brass }}>{w.volume.toLocaleString()}<span style={{ fontSize: 10, color: C.inkSub }}>kg</span></div>
+                {(() => {
+                  const metric = workoutPrimaryMetric(w);
+                  return <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 600, color: C.brass }}>{metric.value}<span style={{ fontSize: 10, color: C.inkSub }}>{metric.suffix}</span></div>;
+                })()}
               </Panel>
             ))}
           </div>
@@ -538,14 +607,17 @@ function WorkoutTab({ data, commit }) {
   const startExercise = (ex) => {
     setExercise(ex);
     const last = lastOf(ex);
-    setSets(last ? last.sets.map((s) => ({ ...s })) : [{ weight: 40, reps: 10 }]);
+    const mode = exerciseMeta(ex).mode;
+    setSets(last ? last.sets.map((s) => normalizeSet(s, mode)) : [defaultSetFor(ex)]);
     setDate(todayStr());
   };
 
   const save = () => {
-    const volume = sets.reduce((s, x) => s + x.weight * x.reps, 0);
+    const mode = exerciseMeta(exercise).mode;
+    const normalized = sets.map((s) => normalizeSet(s, mode));
+    const volume = mode === "weighted" ? normalized.reduce((s, x) => s + x.weight * x.reps, 0) : 0;
     const xpGain = 15 + sets.length * 5;
-    const entry = { id: Date.now(), date, exercise, muscle, sets, volume };
+    const entry = { id: Date.now(), date, exercise, muscle, mode, sets: normalized, volume };
     commit({ ...data, workouts: [...data.workouts, entry], xp: data.xp + xpGain }, xpGain);
     setExercise(null);
   };
@@ -554,13 +626,16 @@ function WorkoutTab({ data, commit }) {
   const weekData = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
     const key = keyOf(d);
-    const vol = data.workouts.filter((w) => w.date === key).reduce((s, w) => s + w.volume, 0);
-    return { day: ["日","月","火","水","木","金","土"][d.getDay()], vol };
+    const sets = totalSets(data.workouts.filter((w) => w.date === key));
+    return { day: ["日","月","火","水","木","金","土"][d.getDay()], sets };
   });
 
   if (exercise) {
     const last = lastOf(exercise);
-    const volume = sets.reduce((s, x) => s + x.weight * x.reps, 0);
+    const meta = exerciseMeta(exercise);
+    const mode = meta.mode;
+    const normalizedSets = sets.map((s) => normalizeSet(s, mode));
+    const metric = workoutPrimaryMetric({ exercise, mode, sets: normalizedSets });
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <button className="back-btn" onClick={() => setExercise(null)}>← 戻る</button>
@@ -568,10 +643,11 @@ function WorkoutTab({ data, commit }) {
           <span style={{ fontSize: 12, color: C.ember, fontWeight: 800 }}>{muscle}</span>
           <h2 style={{ fontSize: 25, fontWeight: 800, margin: "2px 0 0" }}>{exercise}</h2>
           {last && (
-            <button className="copy-chip" onClick={() => setSets(last.sets.map((s) => ({ ...s })))}>
-              <Copy size={12} /> 前回: {last.sets.map((s) => `${s.weight}×${s.reps}`).join(" / ")}
+            <button className="copy-chip" onClick={() => setSets(last.sets.map((s) => normalizeSet(s, mode)))}>
+              <Copy size={12} /> 前回: {formatWorkoutSets(last)}
             </button>
           )}
+          <div style={{ fontSize: 12, color: C.inkSub, marginTop: 8 }}>記録単位：{meta.unit}</div>
         </div>
 
         <Panel style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -583,23 +659,39 @@ function WorkoutTab({ data, commit }) {
         {sets.map((s, i) => (
           <Panel key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px" }}>
             <div style={{ fontFamily: "'Oswald',sans-serif", color: C.inkSub, fontWeight: 600, width: 26 }}>#{i + 1}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
-              <span style={{ fontSize: 10, color: C.inkSub }}>重量</span>
-              <Stepper value={s.weight} step={2.5} suffix="kg" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, weight: v } : x)))} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
-              <span style={{ fontSize: 10, color: C.inkSub }}>回数</span>
-              <Stepper value={s.reps} step={1} min={1} suffix="回" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, reps: v } : x)))} />
-            </div>
+            {mode === "weighted" && (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+                  <span style={{ fontSize: 10, color: C.inkSub }}>重量</span>
+                  <Stepper value={s.weight} step={2.5} suffix="kg" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, weight: v } : x)))} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+                  <span style={{ fontSize: 10, color: C.inkSub }}>回数</span>
+                  <Stepper value={s.reps} step={1} min={1} suffix="回" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, reps: v } : x)))} />
+                </div>
+              </>
+            )}
+            {mode === "reps" && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+                <span style={{ fontSize: 10, color: C.inkSub }}>回数</span>
+                <Stepper value={s.reps} step={1} min={1} suffix="回" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, reps: v } : x)))} />
+              </div>
+            )}
+            {mode === "timed" && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+                <span style={{ fontSize: 10, color: C.inkSub }}>時間</span>
+                <Stepper value={s.seconds} step={10} min={10} suffix="秒" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, seconds: v } : x)))} />
+              </div>
+            )}
             <button className="icon-btn" onClick={() => setSets(sets.filter((_, j) => j !== i))} disabled={sets.length === 1}><Trash2 size={16} /></button>
           </Panel>
         ))}
 
-        <button className="ghost-btn" onClick={() => setSets([...sets, { ...sets[sets.length - 1] }])}><Plus size={16} /> セットを追加</button>
+        <button className="ghost-btn" onClick={() => setSets([...sets, normalizeSet(sets[sets.length - 1], mode)])}><Plus size={16} /> セットを追加</button>
 
         <Panel style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(168deg, ${C.panelHi}, ${C.panel})` }}>
-          <span style={{ fontSize: 13, color: C.inkSub }}>合計挙上量</span>
-          <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: 30, fontWeight: 700, color: C.brass }}>{volume.toLocaleString()}<span style={{ fontSize: 13, color: C.inkSub }}> kg</span></span>
+          <span style={{ fontSize: 13, color: C.inkSub }}>{metric.label}</span>
+          <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: 30, fontWeight: 700, color: C.brass }}>{metric.value}<span style={{ fontSize: 13, color: C.inkSub }}> {metric.suffix}</span></span>
         </Panel>
 
         <button className="primary-btn big" onClick={save}><Zap size={18} fill="#2A1208" /> 記録する（+{15 + sets.length * 5} XP）</button>
@@ -610,7 +702,7 @@ function WorkoutTab({ data, commit }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <SectionLabel>週間ボリューム</SectionLabel>
+        <SectionLabel>週間トレーニング</SectionLabel>
         <Panel style={{ padding: "14px 8px 6px" }}>
           <ResponsiveContainer width="100%" height={130}>
             <BarChart data={weekData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
@@ -620,8 +712,8 @@ function WorkoutTab({ data, commit }) {
                 </linearGradient>
               </defs>
               <XAxis dataKey="day" tick={{ fill: C.inkSub, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tipStyle} formatter={(v) => [`${v.toLocaleString()} kg`, "挙上量"]} />
-              <Bar dataKey="vol" fill="url(#barEmber)" radius={[5, 5, 0, 0]} />
+                <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tipStyle} formatter={(v) => [`${v.toLocaleString()} セット`, "セット数"]} />
+                <Bar dataKey="sets" fill="url(#barEmber)" radius={[5, 5, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Panel>
@@ -646,7 +738,7 @@ function WorkoutTab({ data, commit }) {
               <button key={ex} className="exercise-row" onClick={() => startExercise(ex)}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontWeight: 700, fontSize: 15 }}>{ex}</div>
-                  {last && <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>前回 {fmtDate(last.date)}: {last.sets.map((s) => `${s.weight}×${s.reps}`).join(" / ")}</div>}
+                  {last && <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>前回 {fmtDate(last.date)}: {formatWorkoutSets(last)}</div>}
                 </div>
                 <ChevronRight size={18} color={C.dim} />
               </button>
@@ -664,10 +756,13 @@ function WorkoutTab({ data, commit }) {
                 <div>
                   <span style={{ fontSize: 11, color: C.inkSub, marginRight: 8 }}>{fmtDate(w.date)}</span>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{w.exercise}</span>
-                  <div style={{ fontSize: 11, color: C.inkSub }}>{w.sets.map((s) => `${s.weight}×${s.reps}`).join(" / ")}</div>
+                  <div style={{ fontSize: 11, color: C.inkSub }}>{formatWorkoutSets(w)}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontFamily: "'Oswald',sans-serif", color: C.brass, fontWeight: 600, fontSize: 14 }}>{w.volume.toLocaleString()}kg</span>
+                  {(() => {
+                    const metric = workoutPrimaryMetric(w);
+                    return <span style={{ fontFamily: "'Oswald',sans-serif", color: C.brass, fontWeight: 600, fontSize: 14 }}>{metric.value}{metric.suffix}</span>;
+                  })()}
                   <button className="icon-btn" onClick={() => removeWorkout(w.id)}><Trash2 size={14} /></button>
                 </div>
               </Panel>
@@ -815,10 +910,12 @@ function PhotosTab({ data, commit }) {
     try {
       const src = await compressImage(file);
       const weight = data.weights.find((w) => w.date === date);
-      const volume = data.workouts.filter((w) => w.date === date).reduce((s, w) => s + w.volume, 0);
+      const dayWorkouts = data.workouts.filter((w) => w.date === date);
+      const volume = dayWorkouts.reduce((s, w) => s + weightedVolume(w), 0);
+      const trainingNote = dayWorkouts.length ? `${dayWorkouts.length}種目/${totalSets(dayWorkouts)}セット` : null;
       const isToday = date === todayStr();
       const isFirstToday = isToday && !(data.photos || []).some((p) => p.date === date);
-      const entry = { id: Date.now(), date, src, note: note.trim(), weightKg: weight?.kg ?? null, volume };
+      const entry = { id: Date.now(), date, src, note: note.trim(), weightKg: weight?.kg ?? null, volume, trainingNote };
       commit({ ...data, photos: [...(data.photos || []), entry], xp: data.xp + (isFirstToday ? 12 : 0) }, isFirstToday ? 12 : 0);
       setNote("");
       if (fileRef.current) fileRef.current.value = "";
@@ -883,7 +980,7 @@ function PhotosTab({ data, commit }) {
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 800 }}>{fmtFull(p.date)}</div>
                     <div style={{ fontSize: 10, color: C.inkSub, marginTop: 2 }}>
-                      {p.weightKg ? `${p.weightKg.toFixed(1)}kg` : "体重なし"} ・ {p.volume ? `${p.volume.toLocaleString()}kg` : "筋トレなし"}
+                      {p.weightKg ? `${p.weightKg.toFixed(1)}kg` : "体重なし"} ・ {p.trainingNote || (p.volume ? `重量 ${p.volume.toLocaleString()}kg` : "筋トレなし")}
                     </div>
                   </div>
                   <button className="icon-btn" onClick={() => removePhoto(p.id)}><Trash2 size={14} /></button>
@@ -949,10 +1046,13 @@ function StatsTab({ data }) {
     return { daysLeft, eta: keyOf(eta), ratePerWeek: +(ratePerDay * 7).toFixed(2) };
   }, [sorted, goal, latest]);
 
-  // 部位別ボリューム
+  // 部位別の重量ボリューム（重量系種目のみ）
   const muscleVol = useMemo(() => {
     const m = {};
-    data.workouts.forEach((w) => { m[w.muscle] = (m[w.muscle] || 0) + w.volume; });
+    data.workouts.forEach((w) => {
+      const vol = weightedVolume(w);
+      if (vol > 0) m[w.muscle] = (m[w.muscle] || 0) + vol;
+    });
     return Object.entries(m).map(([name, vol]) => ({ name, vol })).sort((a, b) => b.vol - a.vol);
   }, [data.workouts]);
 
@@ -1067,7 +1167,7 @@ function StatsTab({ data }) {
       {/* 部位別ボリューム */}
       {muscleVol.length > 0 && (
         <div>
-          <SectionLabel>部位別の総挙上量</SectionLabel>
+          <SectionLabel>部位別の重量ボリューム</SectionLabel>
           <Panel style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {muscleVol.map((m) => {
               const max = muscleVol[0].vol || 1;
@@ -1130,7 +1230,7 @@ function AwardsTab({ data, lv }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
         {[
           { label: "総XP", value: data.xp.toLocaleString() },
-          { label: "総挙上量", value: `${(vol / 1000).toFixed(1)}t` },
+          { label: "重量系", value: `${(vol / 1000).toFixed(1)}t` },
           { label: "総記録数", value: totalLogs(data) },
         ].map((s) => (
           <Panel key={s.label} style={{ textAlign: "center", padding: "16px 8px" }}>
