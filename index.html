@@ -12,8 +12,6 @@
 <link rel="icon" href="data:," />
 <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
-<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js" crossorigin></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
 <style>
   html, body { margin: 0; padding: 0; background: #0E1014; }
@@ -71,13 +69,6 @@ const Download = mk([["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }
 
 // ==== CDNグローバルから必要なものを展開 ====
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
-const _RC = (typeof Recharts !== "undefined") ? Recharts : {};
-const {
-  LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, Area, AreaChart,
-  ResponsiveContainer, BarChart, Bar, CartesianGrid,
-} = _RC;
-
-
 /* ============================================================
    LINEA
    体重・トレーニング・体ラインを記録する。
@@ -345,6 +336,92 @@ function SectionLabel({ children, right }) {
   );
 }
 
+function WeightTrendSvg({ data, goal, height = 190, compact = false, showAverage = false }) {
+  if (!data || data.length < 2) return null;
+  const w = 320;
+  const h = height;
+  const pad = compact ? { t: 12, r: 12, b: 18, l: 12 } : { t: 14, r: 16, b: 28, l: 34 };
+  const values = data.flatMap((d) => [d.kg, showAverage ? d.ma : null]).filter((v) => Number.isFinite(v));
+  if (goal) values.push(goal);
+  const min = Math.floor(Math.min(...values) - 0.5);
+  const max = Math.ceil(Math.max(...values) + 0.5);
+  const range = Math.max(0.1, max - min);
+  const x = (i) => pad.l + (i / (data.length - 1)) * (w - pad.l - pad.r);
+  const y = (v) => pad.t + ((max - v) / range) * (h - pad.t - pad.b);
+  const linePath = (key) => data.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`).join(" ");
+  const weightLine = linePath("kg");
+  const avgLine = showAverage ? linePath("ma") : "";
+  const baseY = h - pad.b;
+  const areaPath = `${weightLine} L${x(data.length - 1).toFixed(1)},${baseY} L${x(0).toFixed(1)},${baseY} Z`;
+  const grid = compact ? [] : [min, +(min + range / 2).toFixed(1), max];
+  const fillId = compact ? "weightMiniFill" : "weightFullFill";
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="体重の推移グラフ" style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={C.jade} stopOpacity={compact ? 0.26 : 0.32} />
+          <stop offset="100%" stopColor={C.jade} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {grid.map((g) => (
+        <g key={g}>
+          <line x1={pad.l} x2={w - pad.r} y1={y(g)} y2={y(g)} stroke={C.stroke} strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />
+          <text x={4} y={y(g) + 3} fill={C.inkSub} fontSize="9" fontFamily="system-ui">{g.toFixed(1)}</text>
+        </g>
+      ))}
+      {goal && (
+        <g>
+          <line x1={pad.l} x2={w - pad.r} y1={y(goal)} y2={y(goal)} stroke={C.brass} strokeDasharray="6 5" vectorEffect="non-scaling-stroke" />
+          {!compact && <text x={w - pad.r - 34} y={y(goal) - 5} fill={C.brass} fontSize="10" fontWeight="800">目標</text>}
+        </g>
+      )}
+      <path d={areaPath} fill={`url(#${fillId})`} />
+      <path d={weightLine} fill="none" stroke={C.jade} strokeWidth={compact ? 2.6 : 2.4} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      {showAverage && <path d={avgLine} fill="none" stroke={C.brass} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+      {data.map((d, i) => (
+        <circle key={`${d.date}-${i}`} cx={x(i)} cy={y(d.kg)} r={compact ? 2.5 : 2.7} fill={C.jade} stroke={C.bg0} strokeWidth="1.5" />
+      ))}
+      <text x={pad.l} y={h - 5} fill={C.inkSub} fontSize="10" fontFamily="system-ui">{data[0].date}</text>
+      <text x={w - pad.r} y={h - 5} textAnchor="end" fill={C.inkSub} fontSize="10" fontFamily="system-ui">{data[data.length - 1].date}</text>
+    </svg>
+  );
+}
+
+function BarTrendSvg({ data, valueKey, labelKey, height = 130, color = C.violet, fillTo = C.brass, unit = "" }) {
+  if (!data || data.length === 0) return null;
+  const w = 320;
+  const h = height;
+  const pad = { t: 14, r: 10, b: 24, l: 10 };
+  const max = Math.max(1, ...data.map((d) => d[valueKey] || 0));
+  const gap = 7;
+  const barW = (w - pad.l - pad.r - gap * (data.length - 1)) / data.length;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="棒グラフ" style={{ display: "block" }}>
+      <defs>
+        <linearGradient id={`barFill-${valueKey}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} />
+          <stop offset="100%" stopColor={fillTo} />
+        </linearGradient>
+      </defs>
+      <line x1={pad.l} x2={w - pad.r} y1={h - pad.b} y2={h - pad.b} stroke={C.stroke} vectorEffect="non-scaling-stroke" />
+      {data.map((d, i) => {
+        const value = d[valueKey] || 0;
+        const bh = Math.max(value > 0 ? 4 : 0, (value / max) * (h - pad.t - pad.b - 10));
+        const bx = pad.l + i * (barW + gap);
+        const by = h - pad.b - bh;
+        return (
+          <g key={`${d[labelKey]}-${i}`}>
+            <rect x={bx} y={by} width={barW} height={bh} rx="5" fill={`url(#barFill-${valueKey})`} />
+            <text x={bx + barW / 2} y={by - 5} textAnchor="middle" fill={C.inkSub} fontSize="9" fontFamily="system-ui">{value ? `${value}${unit}` : ""}</text>
+            <text x={bx + barW / 2} y={h - 6} textAnchor="middle" fill={C.inkSub} fontSize="10" fontFamily="system-ui">{d[labelKey]}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
   const fmt = (v) => (step < 1 ? v.toFixed(1) : String(v));
   const [draft, setDraft] = useState(fmt(value));
@@ -596,6 +673,13 @@ function HomeTab({ data, lv, goTab, commit }) {
   const completed = [todayWeight, todayWorkouts.length > 0, todayPhoto].filter(Boolean).length;
   const next = nextActionFor(data);
   const NextIcon = next.icon;
+  const homeWeightTrend = [...data.weights]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-14)
+    .map((w) => ({ date: fmtDate(w.date), kg: w.kg }));
+  const homeTrendDelta = homeWeightTrend.length >= 2
+    ? +(homeWeightTrend[homeWeightTrend.length - 1].kg - homeWeightTrend[0].kg).toFixed(1)
+    : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -651,6 +735,24 @@ function HomeTab({ data, lv, goTab, commit }) {
         </div>
         <ChevronRight size={18} color={C.dim} />
       </Panel>
+
+      {homeWeightTrend.length >= 2 && (
+        <Panel onClick={() => goTab("stats")} style={{ cursor: "pointer", padding: "15px 10px 9px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 6px 8px" }}>
+            <div>
+              <Eyebrow color={C.jade}>Weight Trend</Eyebrow>
+              <div style={{ fontSize: 15, fontWeight: 900, marginTop: 3 }}>体重の推移</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 22, fontWeight: 700, color: homeTrendDelta <= 0 ? C.jade : C.emberSoft }}>
+                {homeTrendDelta > 0 ? "+" : ""}{homeTrendDelta}<span style={{ fontSize: 11, color: C.inkSub }}> kg</span>
+              </div>
+              <div style={{ fontSize: 10, color: C.inkSub }}>直近{homeWeightTrend.length}件</div>
+            </div>
+          </div>
+          <WeightTrendSvg data={homeWeightTrend} goal={goal} height={116} compact />
+        </Panel>
+      )}
 
       <Panel glow={completed === 3 ? "rgba(95,212,154,0.18)" : "rgba(230,180,80,0.12)"}>
         <SectionLabel right={<span style={{ fontSize: 11, color: completed === 3 ? C.jade : C.brass, fontWeight: 800 }}>{completed}/3</span>}>今日の記録</SectionLabel>
@@ -850,18 +952,7 @@ function WorkoutTab({ data, commit }) {
       <div>
         <SectionLabel>週間トレーニング</SectionLabel>
         <Panel style={{ padding: "14px 8px 6px" }}>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={weekData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-              <defs>
-                <linearGradient id="barEmber" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={C.emberSoft} /><stop offset="100%" stopColor={C.ember} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="day" tick={{ fill: C.inkSub, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tipStyle} formatter={(v) => [`${v.toLocaleString()} セット`, "セット数"]} />
-                <Bar dataKey="sets" fill="url(#barEmber)" radius={[5, 5, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarTrendSvg data={weekData} valueKey="sets" labelKey="day" color={C.emberSoft} fillTo={C.ember} />
         </Panel>
       </div>
 
@@ -955,8 +1046,6 @@ function WeightTab({ data, commit }) {
 
   const chartData = sorted.slice(-30).map((w) => ({ date: fmtDate(w.date), kg: w.kg }));
   const goal = data.profile.goalWeight;
-  const lo = chartData.length ? Math.min(...chartData.map((d) => d.kg), goal ?? Infinity) : 0;
-  const hi = chartData.length ? Math.max(...chartData.map((d) => d.kg), goal ?? -Infinity) : 100;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -982,22 +1071,7 @@ function WeightTab({ data, commit }) {
         <div>
           <SectionLabel>推移（直近30件）</SectionLabel>
           <Panel style={{ padding: "16px 8px 8px" }}>
-            <ResponsiveContainer width="100%" height={190}>
-              <AreaChart data={chartData} margin={{ top: 4, right: 14, left: -14, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="wFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.jade} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={C.jade} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke={C.stroke} strokeDasharray="3 4" vertical={false} />
-                <XAxis dataKey="date" tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={20} />
-                <YAxis domain={[Math.floor(lo - 1), Math.ceil(hi + 1)]} tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
-                <Tooltip contentStyle={tipStyle} formatter={(v) => [`${v} kg`, "体重"]} />
-                {goal && <ReferenceLine y={goal} stroke={C.brass} strokeDasharray="6 4" label={{ value: `目標 ${goal}`, fill: C.brass, fontSize: 10, position: "insideTopRight" }} />}
-                <Area type="monotone" dataKey="kg" stroke={C.jade} strokeWidth={2.5} fill="url(#wFill)" dot={{ r: 2.5, fill: C.jade }} activeDot={{ r: 5 }} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <WeightTrendSvg data={chartData} goal={goal} height={190} />
           </Panel>
         </div>
       )}
@@ -1283,21 +1357,11 @@ function StatsTab({ data }) {
       )}
 
       {/* 移動平均トレンド */}
-      {ma.length >= 3 && (
+      {ma.length >= 2 && (
         <div>
-          <SectionLabel right={<span style={{ fontSize: 10, color: C.inkSub }}>● 実測 <span style={{ color: C.brass }}>― 7日平均</span></span>}>体重トレンド</SectionLabel>
+          <SectionLabel right={<span style={{ fontSize: 10, color: C.inkSub }}>● 実測 <span style={{ color: C.brass }}>― 7日平均</span></span>}>体重の推移</SectionLabel>
           <Panel style={{ padding: "16px 8px 8px" }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={ma} margin={{ top: 4, right: 14, left: -14, bottom: 0 }}>
-                <CartesianGrid stroke={C.stroke} strokeDasharray="3 4" vertical={false} />
-                <XAxis dataKey="date" tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={24} />
-                <YAxis domain={["dataMin - 1", "dataMax + 1"]} tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
-                <Tooltip contentStyle={tipStyle} formatter={(v, n) => [`${v} kg`, n === "ma" ? "7日平均" : "実測"]} />
-                {goal && <ReferenceLine y={goal} stroke={C.brass} strokeDasharray="6 4" label={{ value: `目標`, fill: C.brass, fontSize: 10, position: "insideTopRight" }} />}
-                <Line type="monotone" dataKey="kg" stroke={C.jade} strokeWidth={1} dot={{ r: 2, fill: C.jade }} strokeOpacity={0.5} />
-                <Line type="monotone" dataKey="ma" stroke={C.brass} strokeWidth={2.8} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <WeightTrendSvg data={ma} goal={goal} height={220} showAverage />
           </Panel>
         </div>
       )}
@@ -1360,18 +1424,7 @@ function StatsTab({ data }) {
         <div>
           <SectionLabel>月別トレーニング日数</SectionLabel>
           <Panel style={{ padding: "14px 8px 6px" }}>
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={monthly} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="barViolet" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.violet} /><stop offset="100%" stopColor="#6A5BC4" />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" tick={{ fill: C.inkSub, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tipStyle} formatter={(v) => [`${v} 日`, "トレ日数"]} />
-                <Bar dataKey="days" fill="url(#barViolet)" radius={[5, 5, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarTrendSvg data={monthly} valueKey="days" labelKey="month" color={C.violet} fillTo="#6A5BC4" unit="日" />
           </Panel>
         </div>
       )}
@@ -1426,9 +1479,6 @@ function AwardsTab({ data, lv, commit }) {
     </div>
   );
 }
-
-/* ================= shared chart tooltip ================= */
-const tipStyle = { background: "#212733", border: `1px solid #3A4456`, borderRadius: 10, fontSize: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" };
 
 /* ================= CSS ================= */
 const CSS = `
