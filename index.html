@@ -239,6 +239,30 @@ const DEFAULT_DATA = {
   xp: 0,
 };
 
+function normalizeData(raw) {
+  const data = raw && typeof raw === "object" ? raw : {};
+  return {
+    ...DEFAULT_DATA,
+    ...data,
+    profile: { ...DEFAULT_DATA.profile, ...(data.profile || {}) },
+    weights: Array.isArray(data.weights) ? data.weights : [],
+    workouts: Array.isArray(data.workouts) ? data.workouts : [],
+    photos: Array.isArray(data.photos) ? data.photos : [],
+    xp: Number.isFinite(data.xp) ? data.xp : 0,
+  };
+}
+
+function downloadBackup(data) {
+  const backup = { ...data, exportedAt: new Date().toISOString(), app: "LINEA" };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `linea-backup-${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function todaySummary(data) {
   const today = todayStr();
   const workouts = data.workouts.filter((w) => w.date === today);
@@ -362,6 +386,45 @@ function BadgeToast({ badge, onClose }) {
   );
 }
 
+function DataTools({ data, commit, compact = false }) {
+  const fileRef = useRef(null);
+  const importBackup = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const next = normalizeData(JSON.parse(reader.result));
+        const ok = confirm("バックアップデータで現在の記録を置き換えます。よろしいですか？");
+        if (!ok) return;
+        commit(next);
+        alert("復元しました。");
+      } catch (e) {
+        alert("復元に失敗しました。LINEAのバックアップJSONを選んでください。");
+        console.error(e);
+      } finally {
+        if (fileRef.current) fileRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <Panel glow={compact ? null : "rgba(230,180,80,0.12)"} style={compact ? { padding: 14 } : null}>
+      {!compact && (
+        <div style={{ marginBottom: 12 }}>
+          <Eyebrow color={C.brass}>Backup</Eyebrow>
+          <div style={{ fontSize: 13, color: C.inkSub, marginTop: 5, lineHeight: 1.5 }}>アップデート前やホーム画面アイコンを消す前に、バックアップを残しておくと安心です。</div>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <button className="ghost-btn" onClick={() => downloadBackup(data)}><Download size={16} /> 書き出す</button>
+        <button className="ghost-btn" onClick={() => fileRef.current?.click()}><Copy size={16} /> 復元する</button>
+      </div>
+      <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }} onChange={(e) => importBackup(e.target.files?.[0])} />
+    </Panel>
+  );
+}
+
 /* ================= MAIN ================= */
 
 function TetsuLog() {
@@ -380,7 +443,7 @@ function TetsuLog() {
         const res = await window.storage.get(STORAGE_KEY);
         if (res?.value) {
           const parsed = JSON.parse(res.value);
-          loaded = { ...DEFAULT_DATA, ...parsed, profile: { ...DEFAULT_DATA.profile, ...(parsed.profile || {}) }, photos: parsed.photos || [] };
+          loaded = normalizeData(parsed);
         }
       } catch { /* 初回 */ }
       prevBadges.current = new Set(BADGES.filter((b) => b.check(loaded)).map((b) => b.id));
@@ -443,12 +506,12 @@ function TetsuLog() {
           </div>
         </header>
 
-        {tab === "home" && <HomeTab data={data} lv={lv} goTab={setTab} />}
+        {tab === "home" && <HomeTab data={data} lv={lv} goTab={setTab} commit={commit} />}
         {tab === "workout" && <WorkoutTab data={data} commit={commit} />}
         {tab === "weight" && <WeightTab data={data} commit={commit} />}
         {tab === "photos" && <PhotosTab data={data} commit={commit} />}
         {tab === "stats" && <StatsTab data={data} />}
-        {tab === "awards" && <AwardsTab data={data} lv={lv} />}
+        {tab === "awards" && <AwardsTab data={data} lv={lv} commit={commit} />}
       </div>
 
       <nav className="tabbar">
@@ -481,7 +544,7 @@ function TetsuLog() {
 
 /* ================= HOME ================= */
 
-function HomeTab({ data, lv, goTab }) {
+function HomeTab({ data, lv, goTab, commit }) {
   const { weight: todayWeight, workouts: todayWorkouts, sets: todaySets, photo: todayPhoto } = todaySummary(data);
   const latestWeight = data.weights.length ? data.weights[data.weights.length - 1] : null;
   const goal = data.profile.goalWeight;
@@ -570,6 +633,8 @@ function HomeTab({ data, lv, goTab }) {
         <button className="primary-btn" onClick={() => goTab("workout")}><Dumbbell size={18} /> 筋トレを記録</button>
         <button className="ghost-btn" onClick={() => goTab(todayWeight ? "photos" : "weight")}>{todayWeight ? <Camera size={18} /> : <Scale size={18} />} {todayWeight ? "体ラインを残す" : "体重を記録"}</button>
       </div>
+
+      <DataTools data={data} commit={commit} />
 
       {todayWorkouts.length > 0 && (
         <div>
@@ -1213,18 +1278,9 @@ function StatsTab({ data }) {
 
 /* ================= AWARDS ================= */
 
-function AwardsTab({ data, lv }) {
+function AwardsTab({ data, lv, commit }) {
   const unlocked = BADGES.filter((b) => b.check(data));
   const vol = totalVolume(data);
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `linea-backup-${todayStr()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -1263,7 +1319,7 @@ function AwardsTab({ data, lv }) {
         現在の称号：<span style={{ color: C.brass, fontWeight: 800 }}>{titleForLevel(lv.level)}</span> — 次は「{titleForLevel(Math.min(lv.level + 1, LEVEL_TITLES.length))}」
       </div>
 
-      <button className="ghost-btn" onClick={exportData}><Download size={16} /> データを書き出す</button>
+      <DataTools data={data} commit={commit} compact />
     </div>
   );
 }
