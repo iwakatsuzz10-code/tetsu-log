@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0E1014" />
+<title>鉄ログ — 筋トレ × 体重管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/recharts/umd/Recharts.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #0E1014; }
+  #root { min-height: 100vh; }
+  #loading { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    color: #9AA4B6; font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"><div id="loading">読み込み中…</div></div>
+
+<script type="text/babel" data-presets="react">
+// ==== window.storage を localStorage で再現（GitHub Pages用）====
+window.storage = {
+  async get(key) {
+    const v = localStorage.getItem(key);
+    return v === null ? null : { value: v };
+  },
+  async set(key, value) {
+    localStorage.setItem(key, value);
+    return { value };
+  },
+};
+
+// ==== 軽量インラインアイコン（lucide風 / stroke 1.9）====
+function Icon({ d, size = 24, color = "currentColor", fill = "none", strokeWidth = 1.9, children, style }) {
+  return React.createElement("svg", {
+    width: size, height: size, viewBox: "0 0 24 24", fill,
+    stroke: color, strokeWidth, strokeLinecap: "round", strokeLinejoin: "round", style,
+  }, children || (d ? React.createElement("path", { d }) : null));
+}
+const mk = (paths) => (p) => React.createElement(Icon, p,
+  paths.map((node, i) => React.createElement(node[0], { key: i, ...node[1] }))
+);
+const Flame = mk([["path", { d: "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" }]]);
+const Dumbbell = mk([["path", { d: "M14.4 14.4 9.6 9.6" }], ["path", { d: "M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z" }], ["path", { d: "m21.5 21.5-1.4-1.4" }], ["path", { d: "M3.9 3.9 2.5 2.5" }], ["path", { d: "M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z" }]]);
+const Scale = mk([["path", { d: "m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" }], ["path", { d: "m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" }], ["path", { d: "M7 21h10" }], ["path", { d: "M12 3v18" }], ["path", { d: "M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" }]]);
+const Trophy = mk([["path", { d: "M6 9H4.5a2.5 2.5 0 0 1 0-5H6" }], ["path", { d: "M18 9h1.5a2.5 2.5 0 0 0 0-5H18" }], ["path", { d: "M4 22h16" }], ["path", { d: "M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" }], ["path", { d: "M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" }], ["path", { d: "M18 2H6v7a6 6 0 0 0 12 0V2Z" }]]);
+const Home = mk([["path", { d: "m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" }], ["polyline", { points: "9 22 9 12 15 12 15 22" }]]);
+const Plus = mk([["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]]);
+const Minus = mk([["path", { d: "M5 12h14" }]]);
+const ChevronRight = mk([["path", { d: "m9 18 6-6-6-6" }]]);
+const Copy = mk([["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2" }], ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" }]]);
+const Trash2 = mk([["path", { d: "M3 6h18" }], ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }], ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }], ["line", { x1: "10", x2: "10", y1: "11", y2: "17" }], ["line", { x1: "14", x2: "14", y1: "11", y2: "17" }]]);
+const Target = mk([["circle", { cx: "12", cy: "12", r: "10" }], ["circle", { cx: "12", cy: "12", r: "6" }], ["circle", { cx: "12", cy: "12", r: "2" }]]);
+const TrendingDown = mk([["polyline", { points: "22 17 13.5 8.5 8.5 13.5 2 7" }], ["polyline", { points: "16 17 22 17 22 11" }]]);
+const TrendingUp = mk([["polyline", { points: "22 7 13.5 15.5 8.5 10.5 2 17" }], ["polyline", { points: "16 7 22 7 22 13" }]]);
+const Zap = mk([["polygon", { points: "13 2 3 14 12 14 11 22 21 10 12 10 13 2" }]]);
+const Lock = mk([["rect", { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2" }], ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }]]);
+const BarChart3 = mk([["path", { d: "M3 3v18h18" }], ["path", { d: "M18 17V9" }], ["path", { d: "M13 17V5" }], ["path", { d: "M8 17v-3" }]]);
+const Calendar = mk([["path", { d: "M8 2v4" }], ["path", { d: "M16 2v4" }], ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2" }], ["path", { d: "M3 10h18" }]]);
+
+// ==== CDNグローバルから必要なものを展開 ====
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+const {
+  LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, Area, AreaChart,
+  ResponsiveContainer, BarChart, Bar, CartesianGrid,
+} = Recharts;
+
+
+/* ============================================================
+   鉄ログ — TETSU LOG  v2
+   筋トレ × 体重管理。記録するたびにXPが貯まり、レベルが上がる。
+   ============================================================ */
+
+const STORAGE_KEY = "tetsulog-data-v1";
+
+/* ---- 質感のあるダークパレット（青みのある鋼 + 真鍮）---- */
+const C = {
+  bg0: "#0E1014",      // 最背面
+  bg1: "#13161C",      // ベース
+  panel: "#191D26",    // パネル
+  panelHi: "#212733",  // 明るいパネル
+  stroke: "#2A3140",   // 境界
+  strokeHi: "#3A4456",
+  ink: "#F4F2EC",      // 主要テキスト（チョーク）
+  inkSub: "#9AA4B6",   // サブ
+  dim: "#5E6878",      // 最も淡い
+  ember: "#FF5E3A",    // 主アクセント（炎）
+  emberSoft: "#FF8159",
+  brass: "#E6B450",    // 真鍮ゴールド
+  jade: "#5FD49A",     // 体重・成果
+  jadeDim: "#2E5F4A",
+  violet: "#8B7BE8",
+};
+
+const LEVEL_TITLES = [
+  "見習い", "初心者", "駆け出し", "鍛錬者", "常連",
+  "猛者", "鉄人", "豪傑", "怪物", "守護神", "伝説",
+];
+
+const EXERCISES = {
+  "胸": ["ベンチプレス", "ダンベルプレス", "インクラインプレス", "チェストフライ", "腕立て伏せ"],
+  "背中": ["デッドリフト", "ラットプルダウン", "懸垂", "ベントオーバーロウ", "シーテッドロウ"],
+  "脚": ["スクワット", "レッグプレス", "ランジ", "レッグカール", "カーフレイズ"],
+  "肩": ["ショルダープレス", "サイドレイズ", "リアレイズ", "アップライトロウ"],
+  "腕": ["アームカール", "ハンマーカール", "トライセプスエクステンション", "ディップス"],
+  "体幹": ["プランク", "クランチ", "レッグレイズ", "アブローラー"],
+};
+
+const BADGES = [
+  { id: "first", name: "はじめの一歩", desc: "初めて記録した", icon: "🔥", check: (d) => totalLogs(d) >= 1 },
+  { id: "streak3", name: "三日坊主卒業", desc: "3日連続で記録", icon: "🗓️", check: (d) => calcStreak(d) >= 3 },
+  { id: "streak7", name: "週間皆勤", desc: "7日連続で記録", icon: "📅", check: (d) => calcStreak(d) >= 7 },
+  { id: "streak30", name: "鉄の習慣", desc: "30日連続で記録", icon: "⛓️", check: (d) => calcStreak(d) >= 30 },
+  { id: "vol10k", name: "10トン超え", desc: "総挙上量 10,000kg", icon: "🏋️", check: (d) => totalVolume(d) >= 10000 },
+  { id: "vol100k", name: "100トンの男", desc: "総挙上量 100,000kg", icon: "🚛", check: (d) => totalVolume(d) >= 100000 },
+  { id: "w10", name: "計量の鬼", desc: "体重を10回記録", icon: "⚖️", check: (d) => d.weights.length >= 10 },
+  { id: "w50", name: "体重マスター", desc: "体重を50回記録", icon: "📊", check: (d) => d.weights.length >= 50 },
+  { id: "goal", name: "有言実行", desc: "目標体重を達成", icon: "🎯", check: (d) => {
+      if (!d.profile.goalWeight || d.weights.length === 0) return false;
+      const latest = d.weights[d.weights.length - 1].kg;
+      const start = d.weights[0].kg;
+      return start > d.profile.goalWeight ? latest <= d.profile.goalWeight : latest >= d.profile.goalWeight;
+    } },
+  { id: "lv5", name: "猛者の称号", desc: "レベル5に到達", icon: "👑", check: (d) => levelFromXp(d.xp).level >= 5 },
+];
+
+/* ---------------- helpers ---------------- */
+
+const keyOf = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+const todayStr = () => keyOf(new Date());
+const parseKey = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const fmtDate = (s) => { const [, m, dd] = s.split("-"); return `${Number(m)}/${Number(dd)}`; };
+const fmtFull = (s) => { const [y, m, d] = s.split("-"); const w = ["日","月","火","水","木","金","土"][parseKey(s).getDay()]; return `${Number(m)}月${Number(d)}日(${w})`; };
+const dayLabel = () => { const d = new Date(); const w = ["日","月","火","水","木","金","土"][d.getDay()]; return `${d.getMonth() + 1}月${d.getDate()}日（${w}）`; };
+const daysBetween = (a, b) => Math.round((parseKey(b) - parseKey(a)) / 86400000);
+
+function levelFromXp(xp) {
+  let level = 1;
+  while (xp >= Math.round(60 * Math.pow(level, 1.6))) level++;
+  const cur = level === 1 ? 0 : Math.round(60 * Math.pow(level - 1, 1.6));
+  const next = Math.round(60 * Math.pow(level, 1.6));
+  return { level, cur, next, pct: Math.min(100, ((xp - cur) / (next - cur)) * 100) };
+}
+const titleForLevel = (lv) => LEVEL_TITLES[Math.min(lv - 1, LEVEL_TITLES.length - 1)];
+const totalLogs = (d) => d.weights.length + d.workouts.length;
+const totalVolume = (d) => d.workouts.reduce((s, w) => s + w.volume, 0);
+
+function calcStreak(d) {
+  const dates = new Set([...d.weights.map((w) => w.date), ...d.workouts.map((w) => w.date)]);
+  if (dates.size === 0) return 0;
+  let streak = 0;
+  const cur = new Date();
+  if (!dates.has(keyOf(cur))) cur.setDate(cur.getDate() - 1);
+  while (dates.has(keyOf(cur))) { streak++; cur.setDate(cur.getDate() - 1); }
+  return streak;
+}
+
+const DEFAULT_DATA = {
+  profile: { goalWeight: null, startWeight: null, height: null },
+  weights: [],
+  workouts: [],
+  xp: 0,
+};
+
+/* ---------------- primitives ---------------- */
+
+function Panel({ children, style, glow, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      background: `linear-gradient(168deg, ${C.panelHi} 0%, ${C.panel} 60%)`,
+      borderRadius: 18,
+      border: `1px solid ${C.stroke}`,
+      padding: 18,
+      boxShadow: glow
+        ? `0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 30px -12px ${glow}`
+        : `0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px -16px rgba(0,0,0,0.8)`,
+      ...style,
+    }}>{children}</div>
+  );
+}
+
+function Eyebrow({ children, color = C.inkSub }) {
+  return <div style={{ fontSize: 10.5, letterSpacing: "0.22em", color, textTransform: "uppercase", fontWeight: 800 }}>{children}</div>;
+}
+function SectionLabel({ children, right }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "6px 2px 10px" }}>
+      <Eyebrow>{children}</Eyebrow>
+      {right}
+    </div>
+  );
+}
+
+function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
+  const fmt = (v) => (step < 1 ? v.toFixed(1) : String(v));
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: big ? 16 : 8 }}>
+      <button className="step-btn" onClick={() => onChange(Math.max(min, +(value - step).toFixed(1)))}><Minus size={big ? 22 : 16} /></button>
+      <div style={{
+        fontFamily: "'Oswald',sans-serif", fontSize: big ? 52 : 24, fontWeight: 600,
+        color: C.ink, minWidth: big ? 150 : 70, textAlign: "center", fontVariantNumeric: "tabular-nums",
+        letterSpacing: "-0.01em",
+      }}>
+        {fmt(value)}<span style={{ fontSize: big ? 18 : 12, color: C.inkSub, marginLeft: 5, fontFamily: "inherit" }}>{suffix}</span>
+      </div>
+      <button className="step-btn" onClick={() => onChange(+(value + step).toFixed(1))}><Plus size={big ? 22 : 16} /></button>
+    </div>
+  );
+}
+
+/* ---------------- effects ---------------- */
+
+function XpBurst({ bursts }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 90 }}>
+      {bursts.map((b) => (
+        <div key={b.id} className="xp-float" style={{ left: "50%", bottom: 130 }}>
+          <Zap size={16} style={{ marginRight: 4 }} fill="#2A2008" />+{b.amount} XP
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LevelUpModal({ info, onClose }) {
+  if (!info) return null;
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="levelup-card" onClick={(e) => e.stopPropagation()}>
+        <div className="confetti">{Array.from({ length: 28 }).map((_, i) => <span key={i} style={{ "--i": i }} />)}</div>
+        <Eyebrow color={C.brass}>Level Up</Eyebrow>
+        <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 80, fontWeight: 700, color: C.ink, lineHeight: 1, margin: "6px 0" }}>{info.level}</div>
+        <div style={{ fontSize: 19, color: C.emberSoft, fontWeight: 800 }}>「{titleForLevel(info.level)}」に昇格！</div>
+        <button className="primary-btn" style={{ marginTop: 22, width: "100%" }} onClick={onClose}>続ける</button>
+      </div>
+    </div>
+  );
+}
+
+function BadgeToast({ badge, onClose }) {
+  useEffect(() => { if (!badge) return; const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [badge, onClose]);
+  if (!badge) return null;
+  return (
+    <div className="badge-toast">
+      <span style={{ fontSize: 26 }}>{badge.icon}</span>
+      <div>
+        <Eyebrow color={C.brass}>実績解除</Eyebrow>
+        <div style={{ fontSize: 15, color: C.ink, fontWeight: 800, marginTop: 2 }}>{badge.name}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ================= MAIN ================= */
+
+function TetsuLog() {
+  const [data, setData] = useState(null);
+  const [tab, setTab] = useState("home");
+  const [bursts, setBursts] = useState([]);
+  const [levelUp, setLevelUp] = useState(null);
+  const [newBadge, setNewBadge] = useState(null);
+  const prevBadges = useRef(new Set());
+  const burstId = useRef(0);
+
+  useEffect(() => {
+    (async () => {
+      let loaded = DEFAULT_DATA;
+      try {
+        const res = await window.storage.get(STORAGE_KEY);
+        if (res?.value) loaded = { ...DEFAULT_DATA, ...JSON.parse(res.value) };
+      } catch { /* 初回 */ }
+      prevBadges.current = new Set(BADGES.filter((b) => b.check(loaded)).map((b) => b.id));
+      setData(loaded);
+    })();
+  }, []);
+
+  const commit = useCallback(async (next, gainedXp = 0) => {
+    const before = levelFromXp(next.xp - gainedXp).level;
+    const after = levelFromXp(next.xp).level;
+    setData(next);
+    try { await window.storage.set(STORAGE_KEY, JSON.stringify(next)); } catch (e) { console.error("保存に失敗:", e); }
+    if (gainedXp > 0) {
+      const id = ++burstId.current;
+      setBursts((b) => [...b, { id, amount: gainedXp }]);
+      setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), 1400);
+    }
+    if (after > before) setLevelUp({ level: after });
+    const nowBadges = BADGES.filter((b) => b.check(next));
+    const fresh = nowBadges.find((b) => !prevBadges.current.has(b.id));
+    prevBadges.current = new Set(nowBadges.map((b) => b.id));
+    if (fresh) setNewBadge(fresh);
+  }, []);
+
+  if (!data) {
+    return <div style={{ minHeight: "100vh", background: C.bg1, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkSub, fontFamily: "sans-serif" }}>読み込み中…</div>;
+  }
+
+  const lv = levelFromXp(data.xp);
+  const streak = calcStreak(data);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: `radial-gradient(120% 80% at 50% -10%, #1B212C 0%, ${C.bg1} 45%, ${C.bg0} 100%)`,
+      color: C.ink,
+      fontFamily: "'Helvetica Neue','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",
+      position: "relative", overflowX: "hidden",
+    }}>
+      <style>{CSS}</style>
+
+      <div aria-hidden style={{
+        position: "fixed", right: -50, top: 30, fontSize: 340, fontWeight: 900,
+        color: "rgba(255,255,255,0.018)", userSelect: "none", pointerEvents: "none",
+        fontFamily: "'Hiragino Mincho ProN',serif", lineHeight: 1, zIndex: 0,
+      }}>鍛</div>
+
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: "22px 16px 100px", position: "relative", zIndex: 1 }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <div>
+            <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 27, fontWeight: 700, letterSpacing: "0.04em", display: "flex", alignItems: "baseline", gap: 2 }}>
+              鉄ログ<span style={{ color: C.ember }}>.</span>
+            </div>
+            <div style={{ fontSize: 12, color: C.inkSub, marginTop: 1 }}>{dayLabel()}</div>
+          </div>
+          <div className="streak-pill">
+            <Flame size={16} color={streak > 0 ? C.ember : C.dim} fill={streak > 0 ? C.ember : "none"} />
+            <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 600, fontSize: 17 }}>{streak}</span>
+            <span style={{ fontSize: 11, color: C.inkSub }}>日連続</span>
+          </div>
+        </header>
+
+        {tab === "home" && <HomeTab data={data} lv={lv} goTab={setTab} />}
+        {tab === "workout" && <WorkoutTab data={data} commit={commit} />}
+        {tab === "weight" && <WeightTab data={data} commit={commit} />}
+        {tab === "stats" && <StatsTab data={data} />}
+        {tab === "awards" && <AwardsTab data={data} lv={lv} />}
+      </div>
+
+      <nav className="tabbar">
+        {[
+          { id: "home", icon: Home, label: "ホーム" },
+          { id: "workout", icon: Dumbbell, label: "筋トレ" },
+          { id: "weight", icon: Scale, label: "体重" },
+          { id: "stats", icon: BarChart3, label: "成果" },
+          { id: "awards", icon: Trophy, label: "実績" },
+        ].map((t) => {
+          const Icon = t.icon; const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)} className="tab-btn">
+              <div className="tab-icon" style={{ color: active ? C.ember : C.dim, background: active ? "rgba(255,94,58,0.12)" : "transparent" }}>
+                <Icon size={21} strokeWidth={active ? 2.4 : 1.9} />
+              </div>
+              <span style={{ fontSize: 10, fontWeight: active ? 800 : 600, color: active ? C.ember : C.dim }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <XpBurst bursts={bursts} />
+      <LevelUpModal info={levelUp} onClose={() => setLevelUp(null)} />
+      <BadgeToast badge={newBadge} onClose={() => setNewBadge(null)} />
+    </div>
+  );
+}
+
+/* ================= HOME ================= */
+
+function HomeTab({ data, lv, goTab }) {
+  const today = todayStr();
+  const todayWorkouts = data.workouts.filter((w) => w.date === today);
+  const todayWeight = data.weights.find((w) => w.date === today);
+  const todayVolume = todayWorkouts.reduce((s, w) => s + w.volume, 0);
+  const latestWeight = data.weights.length ? data.weights[data.weights.length - 1] : null;
+  const goal = data.profile.goalWeight;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <Panel glow="rgba(255,94,58,0.25)" style={{ position: "relative", overflow: "hidden" }}>
+        <div className="rank-grain" />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", position: "relative" }}>
+          <div>
+            <Eyebrow color={C.brass}>Current Rank</Eyebrow>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 4 }}>
+              <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: 56, fontWeight: 700, lineHeight: 0.9, letterSpacing: "-0.01em" }}>Lv.{lv.level}</span>
+              <span style={{ fontSize: 19, fontWeight: 800, color: C.brass }}>{titleForLevel(lv.level)}</span>
+            </div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: 11.5, color: C.inkSub }}>
+            次まで<br />
+            <span style={{ color: C.ink, fontFamily: "'Oswald',sans-serif", fontSize: 17, fontWeight: 600 }}>{lv.next - data.xp}</span> XP
+          </div>
+        </div>
+        <div style={{ marginTop: 14, height: 11, background: C.bg0, borderRadius: 999, overflow: "hidden", border: `1px solid ${C.stroke}` }}>
+          <div style={{ height: "100%", width: `${lv.pct}%`, borderRadius: 999, background: `linear-gradient(90deg, ${C.ember}, ${C.brass})`, transition: "width 0.7s cubic-bezier(.2,1,.3,1)", boxShadow: `0 0 12px ${C.ember}88` }} />
+        </div>
+      </Panel>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Panel onClick={() => goTab("workout")} style={{ cursor: "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.ember, fontSize: 12, fontWeight: 800 }}>
+            <Dumbbell size={15} /> 今日の挙上量
+          </div>
+          <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 34, fontWeight: 600, marginTop: 8 }}>
+            {todayVolume.toLocaleString()}<span style={{ fontSize: 13, color: C.inkSub, marginLeft: 4 }}>kg</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>{todayWorkouts.length} 種目</div>
+        </Panel>
+        <Panel onClick={() => goTab("weight")} style={{ cursor: "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, color: C.jade, fontSize: 12, fontWeight: 800 }}>
+            <Scale size={15} /> 体重
+          </div>
+          <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 34, fontWeight: 600, marginTop: 8 }}>
+            {latestWeight ? latestWeight.kg.toFixed(1) : "--"}<span style={{ fontSize: 13, color: C.inkSub, marginLeft: 4 }}>kg</span>
+          </div>
+          <div style={{ fontSize: 11, color: todayWeight ? C.jade : C.inkSub, marginTop: 2 }}>{todayWeight ? "今日 計測済み ✓" : "今日は未計測"}</div>
+        </Panel>
+      </div>
+
+      {goal && latestWeight && (
+        <Panel style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(230,180,80,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Target size={20} color={C.brass} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: C.inkSub }}>目標 {goal.toFixed(1)} kg まで</div>
+            <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 23, fontWeight: 600, color: latestWeight.kg <= goal ? C.jade : C.ink }}>
+              {latestWeight.kg <= goal ? "達成！🎉" : `あと ${(latestWeight.kg - goal).toFixed(1)} kg`}
+            </div>
+          </div>
+          <TrendingDown size={26} color={C.dim} />
+        </Panel>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <button className="primary-btn" onClick={() => goTab("workout")}><Dumbbell size={18} /> 筋トレを記録</button>
+        <button className="ghost-btn" onClick={() => goTab("weight")}><Scale size={18} /> 体重を記録</button>
+      </div>
+
+      {todayWorkouts.length > 0 && (
+        <div>
+          <SectionLabel>今日のトレーニング</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {todayWorkouts.map((w) => (
+              <Panel key={w.id} style={{ padding: "13px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontSize: 11, color: C.ember, fontWeight: 800, marginRight: 8 }}>{w.muscle}</span>
+                  <span style={{ fontWeight: 700 }}>{w.exercise}</span>
+                  <div style={{ fontSize: 12, color: C.inkSub, marginTop: 2 }}>{w.sets.map((s) => `${s.weight}kg×${s.reps}`).join(" / ")}</div>
+                </div>
+                <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 600, color: C.brass }}>{w.volume.toLocaleString()}<span style={{ fontSize: 10, color: C.inkSub }}>kg</span></div>
+              </Panel>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================= WORKOUT ================= */
+
+function WorkoutTab({ data, commit }) {
+  const [muscle, setMuscle] = useState("胸");
+  const [exercise, setExercise] = useState(null);
+  const [sets, setSets] = useState([{ weight: 40, reps: 10 }]);
+  const [date, setDate] = useState(todayStr());
+
+  const lastOf = (ex) => [...data.workouts].reverse().find((w) => w.exercise === ex);
+  const startExercise = (ex) => {
+    setExercise(ex);
+    const last = lastOf(ex);
+    setSets(last ? last.sets.map((s) => ({ ...s })) : [{ weight: 40, reps: 10 }]);
+    setDate(todayStr());
+  };
+
+  const save = () => {
+    const volume = sets.reduce((s, x) => s + x.weight * x.reps, 0);
+    const xpGain = 15 + sets.length * 5;
+    const entry = { id: Date.now(), date, exercise, muscle, sets, volume };
+    commit({ ...data, workouts: [...data.workouts, entry], xp: data.xp + xpGain }, xpGain);
+    setExercise(null);
+  };
+  const removeWorkout = (id) => commit({ ...data, workouts: data.workouts.filter((w) => w.id !== id) });
+
+  const weekData = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    const key = keyOf(d);
+    const vol = data.workouts.filter((w) => w.date === key).reduce((s, w) => s + w.volume, 0);
+    return { day: ["日","月","火","水","木","金","土"][d.getDay()], vol };
+  });
+
+  if (exercise) {
+    const last = lastOf(exercise);
+    const volume = sets.reduce((s, x) => s + x.weight * x.reps, 0);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <button className="back-btn" onClick={() => setExercise(null)}>← 戻る</button>
+        <div>
+          <span style={{ fontSize: 12, color: C.ember, fontWeight: 800 }}>{muscle}</span>
+          <h2 style={{ fontSize: 25, fontWeight: 800, margin: "2px 0 0" }}>{exercise}</h2>
+          {last && (
+            <button className="copy-chip" onClick={() => setSets(last.sets.map((s) => ({ ...s })))}>
+              <Copy size={12} /> 前回: {last.sets.map((s) => `${s.weight}×${s.reps}`).join(" / ")}
+            </button>
+          )}
+        </div>
+
+        <Panel style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+          <Calendar size={16} color={C.inkSub} />
+          <span style={{ fontSize: 13, color: C.inkSub }}>記録日</span>
+          <input type="date" className="date-input" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value)} />
+        </Panel>
+
+        {sets.map((s, i) => (
+          <Panel key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px" }}>
+            <div style={{ fontFamily: "'Oswald',sans-serif", color: C.inkSub, fontWeight: 600, width: 26 }}>#{i + 1}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+              <span style={{ fontSize: 10, color: C.inkSub }}>重量</span>
+              <Stepper value={s.weight} step={2.5} suffix="kg" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, weight: v } : x)))} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+              <span style={{ fontSize: 10, color: C.inkSub }}>回数</span>
+              <Stepper value={s.reps} step={1} min={1} suffix="回" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, reps: v } : x)))} />
+            </div>
+            <button className="icon-btn" onClick={() => setSets(sets.filter((_, j) => j !== i))} disabled={sets.length === 1}><Trash2 size={16} /></button>
+          </Panel>
+        ))}
+
+        <button className="ghost-btn" onClick={() => setSets([...sets, { ...sets[sets.length - 1] }])}><Plus size={16} /> セットを追加</button>
+
+        <Panel style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(168deg, ${C.panelHi}, ${C.panel})` }}>
+          <span style={{ fontSize: 13, color: C.inkSub }}>合計挙上量</span>
+          <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: 30, fontWeight: 700, color: C.brass }}>{volume.toLocaleString()}<span style={{ fontSize: 13, color: C.inkSub }}> kg</span></span>
+        </Panel>
+
+        <button className="primary-btn big" onClick={save}><Zap size={18} fill="#2A1208" /> 記録する（+{15 + sets.length * 5} XP）</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div>
+        <SectionLabel>週間ボリューム</SectionLabel>
+        <Panel style={{ padding: "14px 8px 6px" }}>
+          <ResponsiveContainer width="100%" height={130}>
+            <BarChart data={weekData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barEmber" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={C.emberSoft} /><stop offset="100%" stopColor={C.ember} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="day" tick={{ fill: C.inkSub, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tipStyle} formatter={(v) => [`${v.toLocaleString()} kg`, "挙上量"]} />
+              <Bar dataKey="vol" fill="url(#barEmber)" radius={[5, 5, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+      </div>
+
+      <div>
+        <SectionLabel>部位を選ぶ</SectionLabel>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {Object.keys(EXERCISES).map((m) => (
+            <button key={m} onClick={() => setMuscle(m)} className="muscle-chip"
+              style={{ background: muscle === m ? C.ember : C.panel, color: muscle === m ? "#1A0E08" : C.ink, borderColor: muscle === m ? C.ember : C.stroke }}>{m}</button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionLabel>種目を選ぶ</SectionLabel>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {EXERCISES[muscle].map((ex) => {
+            const last = [...data.workouts].reverse().find((w) => w.exercise === ex);
+            return (
+              <button key={ex} className="exercise-row" onClick={() => startExercise(ex)}>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{ex}</div>
+                  {last && <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>前回 {fmtDate(last.date)}: {last.sets.map((s) => `${s.weight}×${s.reps}`).join(" / ")}</div>}
+                </div>
+                <ChevronRight size={18} color={C.dim} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {data.workouts.length > 0 && (
+        <div>
+          <SectionLabel>最近の記録</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...data.workouts].reverse().slice(0, 8).map((w) => (
+              <Panel key={w.id} style={{ padding: "11px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontSize: 11, color: C.inkSub, marginRight: 8 }}>{fmtDate(w.date)}</span>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{w.exercise}</span>
+                  <div style={{ fontSize: 11, color: C.inkSub }}>{w.sets.map((s) => `${s.weight}×${s.reps}`).join(" / ")}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: "'Oswald',sans-serif", color: C.brass, fontWeight: 600, fontSize: 14 }}>{w.volume.toLocaleString()}kg</span>
+                  <button className="icon-btn" onClick={() => removeWorkout(w.id)}><Trash2 size={14} /></button>
+                </div>
+              </Panel>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================= WEIGHT (過去日付対応) ================= */
+
+function WeightTab({ data, commit }) {
+  const sorted = [...data.weights].sort((a, b) => a.date.localeCompare(b.date));
+  const latest = sorted.length ? sorted[sorted.length - 1].kg : 65.0;
+  const [kg, setKg] = useState(latest);
+  const [date, setDate] = useState(todayStr());
+  const [goalInput, setGoalInput] = useState(data.profile.goalWeight ?? "");
+  const [editing, setEditing] = useState(false);
+
+  const existingForDate = data.weights.find((w) => w.date === date);
+  const isPast = date !== todayStr();
+
+  const save = () => {
+    const others = data.weights.filter((w) => w.date !== date);
+    const isNew = !existingForDate;
+    // XPは「今日」かつ新規のみ付与（過去日埋めはXPなし=不正防止）
+    const xpGain = (isNew && !isPast) ? 10 : 0;
+    const weights = [...others, { date, kg }].sort((a, b) => a.date.localeCompare(b.date));
+    // startWeightを最古の記録に同期
+    const profile = { ...data.profile, startWeight: weights[0]?.kg ?? null };
+    commit({ ...data, weights, profile, xp: data.xp + xpGain }, xpGain);
+    setEditing(false);
+  };
+  const removeWeight = (d) => {
+    const weights = data.weights.filter((w) => w.date !== d);
+    const profile = { ...data.profile, startWeight: weights.length ? [...weights].sort((a,b)=>a.date.localeCompare(b.date))[0].kg : null };
+    commit({ ...data, weights, profile });
+  };
+  const saveGoal = () => { const g = parseFloat(goalInput); if (!isNaN(g) && g > 0) commit({ ...data, profile: { ...data.profile, goalWeight: g } }); };
+
+  const chartData = sorted.slice(-30).map((w) => ({ date: fmtDate(w.date), kg: w.kg }));
+  const goal = data.profile.goalWeight;
+  const lo = chartData.length ? Math.min(...chartData.map((d) => d.kg), goal ?? Infinity) : 0;
+  const hi = chartData.length ? Math.max(...chartData.map((d) => d.kg), goal ?? -Infinity) : 100;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <Panel glow="rgba(95,212,154,0.18)" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "22px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Calendar size={15} color={C.inkSub} />
+          <input type="date" className="date-input" value={date} max={todayStr()} onChange={(e) => { setDate(e.target.value); const ex = data.weights.find((w) => w.date === e.target.value); setKg(ex ? ex.kg : latest); }} />
+          {isPast && <span className="past-tag">過去日</span>}
+        </div>
+        <Eyebrow color={existingForDate ? C.brass : C.inkSub}>{existingForDate ? "記録を上書き" : "新規記録"}</Eyebrow>
+        <Stepper value={kg} step={0.1} suffix="kg" big onChange={setKg} />
+        <div style={{ display: "flex", gap: 8 }}>
+          {[-0.5, -0.1, +0.1, +0.5].map((d) => (
+            <button key={d} className="quick-chip" onClick={() => setKg(+(kg + d).toFixed(1))}>{d > 0 ? `+${d}` : d}</button>
+          ))}
+        </div>
+        <button className="primary-btn big" style={{ width: "100%", background: `linear-gradient(135deg, ${C.jade}, #8FE6BD)`, color: "#06251A", boxShadow: "0 4px 16px rgba(95,212,154,0.25)" }} onClick={save}>
+          <Zap size={18} fill="#06251A" /> {existingForDate ? "上書きする" : (isPast ? "過去の記録を追加" : "記録する（+10 XP）")}
+        </button>
+      </Panel>
+
+      {chartData.length >= 2 && (
+        <div>
+          <SectionLabel>推移（直近30件）</SectionLabel>
+          <Panel style={{ padding: "16px 8px 8px" }}>
+            <ResponsiveContainer width="100%" height={190}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 14, left: -14, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="wFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C.jade} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={C.jade} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={C.stroke} strokeDasharray="3 4" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={20} />
+                <YAxis domain={[Math.floor(lo - 1), Math.ceil(hi + 1)]} tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+                <Tooltip contentStyle={tipStyle} formatter={(v) => [`${v} kg`, "体重"]} />
+                {goal && <ReferenceLine y={goal} stroke={C.brass} strokeDasharray="6 4" label={{ value: `目標 ${goal}`, fill: C.brass, fontSize: 10, position: "insideTopRight" }} />}
+                <Area type="monotone" dataKey="kg" stroke={C.jade} strokeWidth={2.5} fill="url(#wFill)" dot={{ r: 2.5, fill: C.jade }} activeDot={{ r: 5 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Panel>
+        </div>
+      )}
+
+      <div>
+        <SectionLabel>目標体重</SectionLabel>
+        <Panel style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Target size={18} color={C.brass} />
+          <input className="goal-input" type="number" step="0.1" placeholder="例: 65.0" value={goalInput} onChange={(e) => setGoalInput(e.target.value)} />
+          <span style={{ color: C.inkSub, fontSize: 13 }}>kg</span>
+          <button className="ghost-btn" style={{ padding: "9px 16px" }} onClick={saveGoal}>設定</button>
+        </Panel>
+      </div>
+
+      {data.weights.length > 0 && (
+        <div>
+          <SectionLabel right={<button className="text-link" onClick={() => setEditing(!editing)}>{editing ? "完了" : "編集"}</button>}>履歴（全{data.weights.length}件）</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+            {[...data.weights].sort((a, b) => b.date.localeCompare(a.date)).map((w, i, arr) => {
+              const prev = arr[i + 1];
+              const diff = prev ? +(w.kg - prev.kg).toFixed(1) : null;
+              return (
+                <Panel key={w.date} style={{ padding: "11px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: C.inkSub }}>{fmtFull(w.date)}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 600, fontSize: 16 }}>{w.kg.toFixed(1)} kg</span>
+                    {diff !== null && diff !== 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 800, color: diff < 0 ? C.jade : C.emberSoft }}>{diff > 0 ? `+${diff}` : diff}</span>
+                    )}
+                    {editing && <button className="icon-btn" onClick={() => removeWeight(w.date)}><Trash2 size={14} /></button>}
+                  </div>
+                </Panel>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================= STATS（成果の可視化）================= */
+
+function StatsTab({ data }) {
+  const sorted = [...data.weights].sort((a, b) => a.date.localeCompare(b.date));
+  const hasW = sorted.length >= 1;
+  const start = hasW ? sorted[0] : null;
+  const latest = hasW ? sorted[sorted.length - 1] : null;
+  const goal = data.profile.goalWeight;
+  const totalDelta = hasW ? +(latest.kg - start.kg).toFixed(1) : 0;
+
+  // 7日移動平均（ノイズを消して「本当の傾向」を見せる）
+  const ma = useMemo(() => {
+    return sorted.map((w, i) => {
+      const win = sorted.slice(Math.max(0, i - 6), i + 1);
+      const avg = win.reduce((s, x) => s + x.kg, 0) / win.length;
+      return { date: fmtDate(w.date), kg: w.kg, ma: +avg.toFixed(2) };
+    });
+  }, [sorted]);
+
+  // 直近7日 vs その前7日の平均で勢いを判定
+  const momentum = useMemo(() => {
+    if (sorted.length < 4) return null;
+    const last7 = sorted.slice(-7), prev7 = sorted.slice(-14, -7);
+    if (!prev7.length) return null;
+    const a = last7.reduce((s, x) => s + x.kg, 0) / last7.length;
+    const b = prev7.reduce((s, x) => s + x.kg, 0) / prev7.length;
+    return +(a - b).toFixed(2);
+  }, [sorted]);
+
+  // 目標到達予測
+  const projection = useMemo(() => {
+    if (!goal || sorted.length < 2) return null;
+    const recent = sorted.slice(-14);
+    if (recent.length < 2) return null;
+    const days = daysBetween(recent[0].date, recent[recent.length - 1].date) || 1;
+    const ratePerDay = (recent[recent.length - 1].kg - recent[0].kg) / days;
+    const remaining = goal - latest.kg;
+    if (Math.abs(ratePerDay) < 0.001) return null;
+    if ((remaining < 0) !== (ratePerDay < 0)) return { off: true }; // 目標と逆方向
+    const daysLeft = Math.ceil(remaining / ratePerDay);
+    if (daysLeft <= 0 || daysLeft > 2000) return null;
+    const eta = new Date(); eta.setDate(eta.getDate() + daysLeft);
+    return { daysLeft, eta: keyOf(eta), ratePerWeek: +(ratePerDay * 7).toFixed(2) };
+  }, [sorted, goal, latest]);
+
+  // 部位別ボリューム
+  const muscleVol = useMemo(() => {
+    const m = {};
+    data.workouts.forEach((w) => { m[w.muscle] = (m[w.muscle] || 0) + w.volume; });
+    return Object.entries(m).map(([name, vol]) => ({ name, vol })).sort((a, b) => b.vol - a.vol);
+  }, [data.workouts]);
+
+  // 月別トレ回数（直近6ヶ月）
+  const monthly = useMemo(() => {
+    const out = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(); d.setMonth(d.getMonth() - i);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const days = new Set(data.workouts.filter((w) => w.date.startsWith(ym)).map((w) => w.date));
+      out.push({ month: `${d.getMonth() + 1}月`, days: days.size });
+    }
+    return out;
+  }, [data.workouts]);
+
+  if (!hasW && data.workouts.length === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "60px 20px", textAlign: "center" }}>
+        <BarChart3 size={40} color={C.dim} />
+        <div style={{ color: C.inkSub, fontSize: 14 }}>記録が貯まると、ここに成果が<br />グラフで可視化されます。</div>
+        <div style={{ fontSize: 12, color: C.dim }}>まずは体重か筋トレを記録してみましょう。</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* 体重の総変化 ハイライト */}
+      {hasW && (
+        <Panel glow={totalDelta <= 0 ? "rgba(95,212,154,0.2)" : "rgba(255,94,58,0.18)"}>
+          <Eyebrow color={C.brass}>開始からの変化</Eyebrow>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: 52, fontWeight: 700, color: totalDelta <= 0 ? C.jade : C.emberSoft, lineHeight: 0.9 }}>
+                {totalDelta > 0 ? "+" : ""}{totalDelta}
+              </span>
+              <span style={{ fontSize: 16, color: C.inkSub }}>kg</span>
+              {totalDelta <= 0 ? <TrendingDown size={22} color={C.jade} /> : <TrendingUp size={22} color={C.emberSoft} />}
+            </div>
+            <div style={{ textAlign: "right", fontSize: 12, color: C.inkSub, lineHeight: 1.5 }}>
+              {start.kg.toFixed(1)} → <span style={{ color: C.ink, fontWeight: 700 }}>{latest.kg.toFixed(1)}</span> kg<br />
+              <span style={{ fontSize: 11 }}>{fmtDate(start.date)} 〜 {fmtDate(latest.date)}・{sorted.length}回計測</span>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* 移動平均トレンド */}
+      {ma.length >= 3 && (
+        <div>
+          <SectionLabel right={<span style={{ fontSize: 10, color: C.inkSub }}>● 実測 <span style={{ color: C.brass }}>― 7日平均</span></span>}>体重トレンド</SectionLabel>
+          <Panel style={{ padding: "16px 8px 8px" }}>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={ma} margin={{ top: 4, right: 14, left: -14, bottom: 0 }}>
+                <CartesianGrid stroke={C.stroke} strokeDasharray="3 4" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={24} />
+                <YAxis domain={["dataMin - 1", "dataMax + 1"]} tick={{ fill: C.inkSub, fontSize: 10 }} axisLine={false} tickLine={false} width={36} />
+                <Tooltip contentStyle={tipStyle} formatter={(v, n) => [`${v} kg`, n === "ma" ? "7日平均" : "実測"]} />
+                {goal && <ReferenceLine y={goal} stroke={C.brass} strokeDasharray="6 4" label={{ value: `目標`, fill: C.brass, fontSize: 10, position: "insideTopRight" }} />}
+                <Line type="monotone" dataKey="kg" stroke={C.jade} strokeWidth={1} dot={{ r: 2, fill: C.jade }} strokeOpacity={0.5} />
+                <Line type="monotone" dataKey="ma" stroke={C.brass} strokeWidth={2.8} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Panel>
+        </div>
+      )}
+
+      {/* 勢い + 予測 */}
+      {(momentum !== null || projection) && (
+        <div style={{ display: "grid", gridTemplateColumns: projection && !projection.off ? "1fr 1fr" : "1fr", gap: 12 }}>
+          {momentum !== null && (
+            <Panel>
+              <Eyebrow>直近の勢い</Eyebrow>
+              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 26, fontWeight: 700, color: momentum <= 0 ? C.jade : C.emberSoft, marginTop: 6 }}>
+                {momentum > 0 ? "+" : ""}{momentum} <span style={{ fontSize: 12, color: C.inkSub }}>kg/週</span>
+              </div>
+              <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>過去7日 vs その前7日</div>
+            </Panel>
+          )}
+          {projection && !projection.off && (
+            <Panel glow="rgba(230,180,80,0.15)">
+              <Eyebrow color={C.brass}>目標到達予測</Eyebrow>
+              <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 26, fontWeight: 700, color: C.brass, marginTop: 6 }}>
+                あと{projection.daysLeft}<span style={{ fontSize: 12, color: C.inkSub }}>日</span>
+              </div>
+              <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>このペースなら {fmtDate(projection.eta)} 頃</div>
+            </Panel>
+          )}
+          {projection && projection.off && (
+            <Panel>
+              <Eyebrow>目標到達予測</Eyebrow>
+              <div style={{ fontSize: 13, color: C.inkSub, marginTop: 8, lineHeight: 1.5 }}>今のペースは目標と逆方向です。直近の傾向を見直しましょう。</div>
+            </Panel>
+          )}
+        </div>
+      )}
+
+      {/* 部位別ボリューム */}
+      {muscleVol.length > 0 && (
+        <div>
+          <SectionLabel>部位別の総挙上量</SectionLabel>
+          <Panel style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {muscleVol.map((m) => {
+              const max = muscleVol[0].vol || 1;
+              return (
+                <div key={m.name}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700 }}>{m.name}</span>
+                    <span style={{ fontFamily: "'Oswald',sans-serif", color: C.inkSub }}>{m.vol.toLocaleString()} kg</span>
+                  </div>
+                  <div style={{ height: 8, background: C.bg0, borderRadius: 999, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(m.vol / max) * 100}%`, background: `linear-gradient(90deg, ${C.ember}, ${C.brass})`, borderRadius: 999 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </Panel>
+        </div>
+      )}
+
+      {/* 月別トレ日数 */}
+      {data.workouts.length > 0 && (
+        <div>
+          <SectionLabel>月別トレーニング日数</SectionLabel>
+          <Panel style={{ padding: "14px 8px 6px" }}>
+            <ResponsiveContainer width="100%" height={130}>
+              <BarChart data={monthly} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="barViolet" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={C.violet} /><stop offset="100%" stopColor="#6A5BC4" />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" tick={{ fill: C.inkSub, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={tipStyle} formatter={(v) => [`${v} 日`, "トレ日数"]} />
+                <Bar dataKey="days" fill="url(#barViolet)" radius={[5, 5, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Panel>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================= AWARDS ================= */
+
+function AwardsTab({ data, lv }) {
+  const unlocked = BADGES.filter((b) => b.check(data));
+  const vol = totalVolume(data);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+        {[
+          { label: "総XP", value: data.xp.toLocaleString() },
+          { label: "総挙上量", value: `${(vol / 1000).toFixed(1)}t` },
+          { label: "総記録数", value: totalLogs(data) },
+        ].map((s) => (
+          <Panel key={s.label} style={{ textAlign: "center", padding: "16px 8px" }}>
+            <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 23, fontWeight: 700, color: C.brass }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: C.inkSub, marginTop: 3 }}>{s.label}</div>
+          </Panel>
+        ))}
+      </div>
+
+      <div>
+        <SectionLabel>実績バッジ（{unlocked.length}/{BADGES.length}）</SectionLabel>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {BADGES.map((b) => {
+            const got = b.check(data);
+            return (
+              <Panel key={b.id} glow={got ? "rgba(230,180,80,0.2)" : null} style={{
+                opacity: got ? 1 : 0.5, textAlign: "center", padding: "18px 10px",
+                border: got ? `1px solid ${C.brass}55` : `1px solid ${C.stroke}`,
+              }}>
+                <div style={{ fontSize: 30 }}>{got ? b.icon : <Lock size={24} color={C.dim} />}</div>
+                <div style={{ fontWeight: 800, fontSize: 13, marginTop: 6 }}>{b.name}</div>
+                <div style={{ fontSize: 11, color: C.inkSub, marginTop: 2 }}>{b.desc}</div>
+              </Panel>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", fontSize: 12, color: C.inkSub, padding: "8px 0 0" }}>
+        現在の称号：<span style={{ color: C.brass, fontWeight: 800 }}>{titleForLevel(lv.level)}</span> — 次は「{titleForLevel(Math.min(lv.level + 1, LEVEL_TITLES.length))}」
+      </div>
+    </div>
+  );
+}
+
+/* ================= shared chart tooltip ================= */
+const tipStyle = { background: "#212733", border: `1px solid #3A4456`, borderRadius: 10, fontSize: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" };
+
+/* ================= CSS ================= */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&display=swap');
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+button { font-family: inherit; cursor: pointer; }
+
+.streak-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #212733, #191D26);
+  border: 1px solid ${C.stroke}; border-radius: 999px; padding: 7px 15px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+.tabbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  display: flex; justify-content: space-around; align-items: center;
+  background: rgba(14,16,20,0.88); backdrop-filter: blur(16px) saturate(1.2);
+  border-top: 1px solid ${C.stroke}; padding: 8px 0 calc(10px + env(safe-area-inset-bottom));
+  max-width: 520px; margin: 0 auto;
+}
+.tab-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; padding: 2px 8px; }
+.tab-icon { display: flex; align-items: center; justify-content: center; width: 40px; height: 30px; border-radius: 10px; transition: background .2s; }
+
+.primary-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(135deg, ${C.ember}, ${C.emberSoft});
+  color: #1A0E08; font-weight: 800; font-size: 14px;
+  border: none; border-radius: 14px; padding: 14px 18px;
+  box-shadow: 0 4px 18px -2px rgba(255,94,58,0.4), 0 1px 0 rgba(255,255,255,0.2) inset;
+  transition: transform .12s, filter .12s;
+}
+.primary-btn:active { transform: scale(0.97); filter: brightness(1.05); }
+.primary-btn.big { font-size: 16px; padding: 16px; }
+
+.ghost-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(168deg, ${C.panelHi}, ${C.panel}); color: ${C.ink};
+  border: 1px solid ${C.stroke}; border-radius: 14px; padding: 14px 18px;
+  font-weight: 700; font-size: 14px; transition: border-color .12s, transform .12s;
+}
+.ghost-btn:active { transform: scale(0.97); border-color: ${C.strokeHi}; }
+
+.back-btn { align-self: flex-start; background: none; border: none; color: ${C.inkSub}; font-size: 14px; font-weight: 700; padding: 6px 4px; }
+
+.step-btn {
+  width: 40px; height: 40px; border-radius: 13px;
+  background: linear-gradient(168deg, ${C.panelHi}, #1B202A); border: 1px solid ${C.stroke};
+  color: ${C.ink}; display: flex; align-items: center; justify-content: center; transition: transform .1s, border-color .1s;
+}
+.step-btn:active { transform: scale(0.9); border-color: ${C.strokeHi}; }
+
+.icon-btn { background: none; border: none; color: ${C.inkSub}; padding: 6px; border-radius: 8px; display: flex; }
+.icon-btn:disabled { opacity: 0.3; }
+
+.muscle-chip { border: 1px solid; border-radius: 999px; padding: 9px 18px; font-weight: 800; font-size: 14px; transition: all .15s; }
+
+.exercise-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(168deg, ${C.panelHi}, ${C.panel}); border: 1px solid ${C.stroke};
+  border-radius: 14px; padding: 14px 16px; color: ${C.ink}; transition: border-color .12s, transform .1s;
+}
+.exercise-row:active { transform: scale(0.99); border-color: ${C.strokeHi}; }
+
+.copy-chip {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+  background: rgba(255,255,255,0.03); border: 1px dashed ${C.strokeHi};
+  color: ${C.inkSub}; border-radius: 999px; padding: 7px 13px; font-size: 12px;
+}
+
+.quick-chip {
+  background: linear-gradient(168deg, ${C.panelHi}, #1B202A); border: 1px solid ${C.stroke};
+  color: ${C.ink}; border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+
+.goal-input {
+  flex: 1; background: ${C.bg0}; border: 1px solid ${C.stroke}; border-radius: 10px;
+  padding: 11px 12px; color: ${C.ink}; font-size: 16px; font-family: 'Oswald', sans-serif; outline: none; transition: border-color .15s;
+}
+.goal-input:focus { border-color: ${C.ember}; }
+
+.date-input {
+  background: ${C.bg0}; border: 1px solid ${C.stroke}; border-radius: 10px;
+  padding: 8px 12px; color: ${C.ink}; font-size: 14px; font-family: inherit; outline: none; color-scheme: dark;
+}
+.date-input:focus { border-color: ${C.ember}; }
+
+.past-tag { font-size: 10px; font-weight: 800; color: ${C.brass}; background: rgba(230,180,80,0.12); border: 1px solid ${C.brass}55; border-radius: 999px; padding: 3px 8px; letter-spacing: 0.05em; }
+
+.text-link { background: none; border: none; color: ${C.ember}; font-size: 12px; font-weight: 800; padding: 0; }
+
+.rank-grain { position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 14px 14px; opacity: 0.5; pointer-events: none; }
+
+.xp-float {
+  position: absolute; transform: translateX(-50%); display: flex; align-items: center;
+  background: linear-gradient(135deg, ${C.brass}, #FFD980); color: #2A2008; font-weight: 800; font-size: 15px;
+  padding: 9px 17px; border-radius: 999px; box-shadow: 0 8px 24px rgba(230,180,80,0.4);
+  animation: floatUp 1.4s ease-out forwards;
+}
+@keyframes floatUp {
+  0% { opacity: 0; transform: translate(-50%, 20px) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  30% { transform: translate(-50%, -6px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -82px) scale(0.95); }
+}
+
+.overlay { position: fixed; inset: 0; z-index: 100; background: rgba(8,9,12,0.82); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.levelup-card {
+  position: relative; overflow: hidden; min-width: 280px;
+  background: linear-gradient(160deg, ${C.panelHi}, ${C.panel}); border: 1px solid ${C.brass}66;
+  border-radius: 24px; padding: 34px 40px; text-align: center;
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,0.8); animation: popIn .4s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.confetti { position: absolute; inset: 0; pointer-events: none; }
+.confetti span {
+  position: absolute; top: -10px; left: calc(var(--i) * 3.6%); width: 7px; height: 11px; border-radius: 2px;
+  background: hsl(calc(var(--i) * 47), 85%, 62%); animation: confFall 2.2s linear infinite; animation-delay: calc(var(--i) * -0.1s);
+}
+@keyframes confFall { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(300px) rotate(540deg); opacity: 0; } }
+
+.badge-toast {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 110;
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(160deg, ${C.panelHi}, ${C.panel}); border: 1px solid ${C.brass}88;
+  border-radius: 16px; padding: 12px 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.55); animation: toastIn .35s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes toastIn { from { transform: translate(-50%, -30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+`;
+
+
+// ==== マウント ====
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(TetsuLog));
+
+</script>
+</body>
+</html>
