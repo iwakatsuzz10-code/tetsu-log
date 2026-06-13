@@ -223,6 +223,66 @@ const workoutPrimaryMetric = (workout) => {
   return { value: weightedVolume(workout).toLocaleString(), suffix: "kg", label: "重量ボリューム" };
 };
 
+const KNOWN_EXERCISES = Object.entries(EXERCISES).flatMap(([muscle, names]) => names.map((name) => ({ muscle, name })));
+const compactText = (s) => s.replace(/[　\s]/g, "").toLowerCase();
+const toHalfWidth = (s) => s.replace(/[０-９．＋－]/g, (ch) => "0123456789.+-"["０１２３４５６７８９．＋－".indexOf(ch)] ?? ch);
+const inferMuscle = (name) => {
+  const exact = KNOWN_EXERCISES.find((e) => compactText(name).includes(compactText(e.name)));
+  if (exact) return exact.muscle;
+  if (/ベンチ|プレス|フライ|胸|チェスト/.test(name)) return "胸";
+  if (/ラット|プル|ロウ|デッド|懸垂|背中/.test(name)) return "背中";
+  if (/スクワット|レッグ|ランジ|カーフ|脚/.test(name)) return "脚";
+  if (/サイド|レイズ|ショルダー|肩/.test(name)) return "肩";
+  if (/カール|トライセプス|ディップス|腕/.test(name)) return "腕";
+  if (/プランク|クランチ|腹|アブ|体幹/.test(name)) return "体幹";
+  return "その他";
+};
+const parseSetSegment = (segment) => {
+  const m = toHalfWidth(segment).match(/(\d+(?:\.\d+)?)\s*kg\s*(.*)/i);
+  if (!m) return [];
+  const weight = parseFloat(m[1]);
+  const reps = [...m[2].matchAll(/\d+(?:\.\d+)?/g)].map((x) => parseInt(x[0], 10)).filter((n) => Number.isFinite(n) && n > 0);
+  return reps.map((rep) => ({ weight, reps: rep }));
+};
+const parseWorkoutText = (text, date = todayStr()) => {
+  const noise = /^(岩井様|.*お疲れ様.*|.*カルテ.*|.*共有.*|[＝=\-ー]+|本日|お願いします|ありがとうございました)$/;
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const parsed = [];
+  let current = null;
+  const flush = () => {
+    if (current && current.sets.length) parsed.push(current);
+    current = null;
+  };
+  lines.forEach((raw) => {
+    const line = toHalfWidth(raw).replace(/\s+/g, " ").trim();
+    if (!line || noise.test(line)) return;
+    if (/kg/i.test(line)) {
+      const pieces = line.split("+").flatMap((part) => parseSetSegment(part));
+      if (pieces.length && current) {
+        current.sets.push(...pieces);
+        if (/\bup\b|アップ|warm/i.test(line)) current.flags.add("up");
+        if (line.includes("+")) current.flags.add("drop");
+      }
+      return;
+    }
+    if (/[\u3040-\u30ff\u3400-\u9fff]/.test(line) && !/^\d/.test(line)) {
+      flush();
+      const known = KNOWN_EXERCISES.find((e) => compactText(line).includes(compactText(e.name)));
+      const exercise = known ? known.name : line;
+      const detail = known ? line.replace(known.name, "").trim() : "";
+      current = { date, exercise, muscle: inferMuscle(line), mode: "weighted", sets: [], detail, flags: new Set(), source: raw };
+    }
+  });
+  flush();
+  return parsed.map((w) => {
+    const bits = ["カルテ解析"];
+    if (w.detail) bits.push(w.detail);
+    if (w.flags.has("up")) bits.push("upあり");
+    if (w.flags.has("drop")) bits.push("ドロップセットあり");
+    return { ...w, note: bits.join(" / "), flags: [...w.flags] };
+  });
+};
+
 function calcStreak(d) {
   const dates = new Set([...d.weights.map((w) => w.date), ...d.workouts.map((w) => w.date), ...(d.photos || []).map((p) => p.date)]);
   if (dates.size === 0) return 0;
@@ -834,6 +894,9 @@ function WorkoutTab({ data, commit }) {
   const [date, setDate] = useState(todayStr());
   const [effort, setEffort] = useState("good");
   const [note, setNote] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importDate, setImportDate] = useState(todayStr());
+  const parsedImport = useMemo(() => parseWorkoutText(importText, importDate), [importText, importDate]);
 
   const lastOf = (ex) => [...data.workouts].reverse().find((w) => w.exercise === ex);
   const startExercise = (ex) => {
@@ -857,6 +920,27 @@ function WorkoutTab({ data, commit }) {
     setNote("");
   };
   const removeWorkout = (id) => commit({ ...data, workouts: data.workouts.filter((w) => w.id !== id) });
+  const importWorkouts = () => {
+    if (!parsedImport.length) return;
+    const now = Date.now();
+    const entries = parsedImport.map((w, i) => {
+      const normalized = w.sets.map((s) => normalizeSet(s, "weighted"));
+      return {
+        id: now + i,
+        date: importDate,
+        exercise: w.exercise,
+        muscle: w.muscle,
+        mode: "weighted",
+        sets: normalized,
+        volume: normalized.reduce((sum, s) => sum + s.weight * s.reps, 0),
+        effort: "good",
+        note: w.note,
+      };
+    });
+    const xpGain = entries.reduce((sum, w) => sum + 15 + w.sets.length * 5, 0);
+    commit({ ...data, workouts: [...data.workouts, ...entries], xp: data.xp + xpGain }, xpGain);
+    setImportText("");
+  };
 
   const weekData = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
@@ -953,6 +1037,42 @@ function WorkoutTab({ data, commit }) {
         <SectionLabel>週間トレーニング</SectionLabel>
         <Panel style={{ padding: "14px 8px 6px" }}>
           <BarTrendSvg data={weekData} valueKey="sets" labelKey="day" color={C.emberSoft} fillTo={C.ember} />
+        </Panel>
+      </div>
+
+      <div>
+        <SectionLabel right={<span style={{ fontSize: 10, color: C.brass, fontWeight: 900 }}>{parsedImport.length ? `${parsedImport.length}種目` : "貼り付け解析"}</span>}>カルテから記録</SectionLabel>
+        <Panel style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Calendar size={16} color={C.inkSub} />
+            <span style={{ fontSize: 13, color: C.inkSub }}>記録日</span>
+            <input type="date" className="date-input" value={importDate} max={todayStr()} onChange={(e) => setImportDate(e.target.value)} />
+          </div>
+          <textarea
+            className="note-input"
+            placeholder={"トレーナーのカルテをそのまま貼り付け\n例：\nベンチプレス\n40kg 10 up\n70kg 9 8\n70kg 5 + 50kg 7"}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+          />
+          {importText.trim() && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {parsedImport.length === 0 && <div style={{ fontSize: 12, color: C.emberSoft }}>まだ種目とセットを読み取れていません。種目名の次の行に「70kg 10 8」のような形式があると解析できます。</div>}
+              {parsedImport.map((w, i) => (
+                <div key={`${w.exercise}-${i}`} className="parsed-row">
+                  <div>
+                    <span style={{ fontSize: 11, color: C.ember, fontWeight: 900, marginRight: 8 }}>{w.muscle}</span>
+                    <span style={{ fontWeight: 900 }}>{w.exercise}</span>
+                    <div style={{ fontSize: 11, color: C.inkSub, marginTop: 3 }}>{formatWorkoutSets(w)}</div>
+                    {w.note && <div style={{ fontSize: 10, color: C.inkSub, marginTop: 3 }}>{w.note}</div>}
+                  </div>
+                  <div style={{ fontFamily: "'Oswald',sans-serif", color: C.brass, fontWeight: 700 }}>{weightedVolume(w).toLocaleString()}<span style={{ fontSize: 10, color: C.inkSub }}>kg</span></div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button className="primary-btn" onClick={importWorkouts} disabled={!parsedImport.length}>
+            <Copy size={17} /> 解析した内容を登録
+          </button>
         </Panel>
       </div>
 
@@ -1570,6 +1690,11 @@ button { font-family: inherit; cursor: pointer; }
   display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid; border-radius: 999px; padding: 3px 8px;
   font-size: 10px; font-weight: 900; white-space: nowrap;
+}
+.parsed-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid ${C.stroke}; border-radius: 12px; padding: 11px 12px;
+  background: rgba(255,255,255,0.025);
 }
 
 .quick-chip {
