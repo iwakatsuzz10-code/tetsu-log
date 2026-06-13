@@ -103,10 +103,11 @@ const LEVEL_TITLES = [
 const EXERCISES = {
   "胸": ["ベンチプレス", "ダンベルプレス", "インクラインプレス", "チェストフライ", "腕立て伏せ"],
   "背中": ["デッドリフト", "ラットプルダウン", "懸垂", "ベントオーバーロウ", "シーテッドロウ"],
-  "脚": ["スクワット", "レッグプレス", "ランジ", "レッグカール", "カーフレイズ"],
+  "脚": ["スクワット", "ブルガリアンスクワット", "ジャンピングスクワット", "レッグプレス", "ランジ", "レッグカール", "カーフレイズ"],
   "肩": ["ショルダープレス", "サイドレイズ", "リアレイズ", "アップライトロウ"],
   "腕": ["アームカール", "ハンマーカール", "トライセプスエクステンション", "ディップス"],
   "体幹": ["プランク", "クランチ", "レッグレイズ", "アブローラー"],
+  "有酸素": ["ランニング", "ウォーキング"],
 };
 
 const EXERCISE_META = {
@@ -121,6 +122,8 @@ const EXERCISE_META = {
   "ベントオーバーロウ": { mode: "weighted", start: { weight: 35, reps: 10 }, unit: "kg x 回" },
   "シーテッドロウ": { mode: "weighted", start: { weight: 35, reps: 10 }, unit: "kg x 回" },
   "スクワット": { mode: "weighted", start: { weight: 50, reps: 10 }, unit: "kg x 回" },
+  "ブルガリアンスクワット": { mode: "reps", start: { reps: 10 }, unit: "回/脚" },
+  "ジャンピングスクワット": { mode: "reps", start: { reps: 15 }, unit: "回" },
   "レッグプレス": { mode: "weighted", start: { weight: 80, reps: 10 }, unit: "kg x 回" },
   "ランジ": { mode: "reps", start: { reps: 10 }, unit: "回/脚" },
   "レッグカール": { mode: "weighted", start: { weight: 25, reps: 12 }, unit: "kg x 回" },
@@ -137,6 +140,8 @@ const EXERCISE_META = {
   "クランチ": { mode: "reps", start: { reps: 15 }, unit: "回" },
   "レッグレイズ": { mode: "reps", start: { reps: 12 }, unit: "回" },
   "アブローラー": { mode: "reps", start: { reps: 8 }, unit: "回" },
+  "ランニング": { mode: "distance", start: { km: 3 }, unit: "km" },
+  "ウォーキング": { mode: "minutes", start: { minutes: 30 }, unit: "分" },
 };
 
 const EFFORTS = [
@@ -188,6 +193,8 @@ const totalLogs = (d) => d.weights.length + d.workouts.length + (d.photos?.lengt
 const exerciseMeta = (name) => EXERCISE_META[name] || { mode: "weighted", start: { weight: 40, reps: 10 }, unit: "kg x 回" };
 const normalizeSet = (set, mode) => {
   if (mode === "timed") return { seconds: set.seconds ?? 60 };
+  if (mode === "minutes") return { minutes: set.minutes ?? 30 };
+  if (mode === "distance") return { km: set.km ?? 3 };
   if (mode === "reps") return { reps: set.reps ?? 10 };
   return { weight: set.weight ?? 40, reps: set.reps ?? 10 };
 };
@@ -202,6 +209,8 @@ const totalSets = (workouts) => workouts.reduce((s, w) => s + w.sets.length, 0);
 const formatSeconds = (sec) => sec >= 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${sec}`;
 const formatSet = (set, mode) => {
   if (mode === "timed") return `${formatSeconds(set.seconds || 0)}秒`;
+  if (mode === "minutes") return `${set.minutes || 0}分`;
+  if (mode === "distance") return `${set.km || 0}km`;
   if (mode === "reps") return `${set.reps || 0}回`;
   return `${set.weight || 0}kg×${set.reps || 0}`;
 };
@@ -215,6 +224,14 @@ const workoutPrimaryMetric = (workout) => {
   if (mode === "timed") {
     const sec = workout.sets.reduce((s, x) => s + (x.seconds || 0), 0);
     return { value: formatSeconds(sec), suffix: "秒", label: "保持時間" };
+  }
+  if (mode === "minutes") {
+    const min = workout.sets.reduce((s, x) => s + (x.minutes || 0), 0);
+    return { value: min.toLocaleString(), suffix: "分", label: "時間" };
+  }
+  if (mode === "distance") {
+    const km = workout.sets.reduce((s, x) => s + (x.km || 0), 0);
+    return { value: Number(km.toFixed(1)).toLocaleString(), suffix: "km", label: "距離" };
   }
   if (mode === "reps") {
     const reps = workout.sets.reduce((s, x) => s + (x.reps || 0), 0);
@@ -1034,11 +1051,25 @@ function WorkoutTab({ data, commit }) {
                 <Stepper value={s.seconds} step={10} min={10} suffix="秒" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, seconds: v } : x)))} />
               </div>
             )}
+            {mode === "minutes" && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+                <span style={{ fontSize: 10, color: C.inkSub }}>時間</span>
+                <Stepper value={s.minutes} step={5} min={1} suffix="分" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, minutes: v } : x)))} />
+              </div>
+            )}
+            {mode === "distance" && (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, alignItems: "center" }}>
+                <span style={{ fontSize: 10, color: C.inkSub }}>距離</span>
+                <Stepper value={s.km} step={0.1} min={0.1} suffix="km" onChange={(v) => setSets(sets.map((x, j) => (j === i ? { ...x, km: v } : x)))} />
+              </div>
+            )}
             <button className="icon-btn" onClick={() => setSets(sets.filter((_, j) => j !== i))} disabled={sets.length === 1}><Trash2 size={16} /></button>
           </Panel>
         ))}
 
-        <button className="ghost-btn" onClick={() => setSets([...sets, normalizeSet(sets[sets.length - 1], mode)])}><Plus size={16} /> セットを追加</button>
+        <button className="ghost-btn" onClick={() => setSets([...sets, normalizeSet(sets[sets.length - 1], mode)])}>
+          <Plus size={16} /> {mode === "distance" || mode === "minutes" ? "記録を追加" : "セットを追加"}
+        </button>
 
         <Panel style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <SectionLabel>手応え</SectionLabel>
