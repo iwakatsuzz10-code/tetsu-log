@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#0E1014" />
-<title>鉄ログ — 筋トレ × 体重管理</title>
+<title>LINEA — 体の変化を記録する</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="icon" href="data:," />
 <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin></script>
@@ -76,8 +76,8 @@ const {
 
 
 /* ============================================================
-   鉄ログ — TETSU LOG  v2
-   筋トレ × 体重管理。記録するたびにXPが貯まり、レベルが上がる。
+   LINEA
+   体重・トレーニング・体ラインを記録する。
    ============================================================ */
 
 const STORAGE_KEY = "tetsulog-data-v1";
@@ -426,13 +426,13 @@ function TetsuLog() {
         position: "fixed", right: -50, top: 30, fontSize: 340, fontWeight: 900,
         color: "rgba(255,255,255,0.018)", userSelect: "none", pointerEvents: "none",
         fontFamily: "'Hiragino Mincho ProN',serif", lineHeight: 1, zIndex: 0,
-      }}>鍛</div>
+      }}>線</div>
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "22px 16px 100px", position: "relative", zIndex: 1 }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div>
             <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 27, fontWeight: 700, letterSpacing: "0.04em", display: "flex", alignItems: "baseline", gap: 2 }}>
-              鉄ログ<span style={{ color: C.ember }}>.</span>
+              LINEA<span style={{ color: C.ember }}>.</span>
             </div>
             <div style={{ fontSize: 12, color: C.inkSub, marginTop: 1 }}>{dayLabel()}</div>
           </div>
@@ -1221,7 +1221,7 @@ function AwardsTab({ data, lv }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `tetsulog-backup-${todayStr()}.json`;
+    a.download = `linea-backup-${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
