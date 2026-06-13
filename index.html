@@ -328,21 +328,36 @@ function SectionLabel({ children, right }) {
 
 function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
   const fmt = (v) => (step < 1 ? v.toFixed(1) : String(v));
-  const parse = (raw) => {
+  const [draft, setDraft] = useState(fmt(value));
+  useEffect(() => { setDraft(fmt(value)); }, [value, step]);
+  const applyDraft = (raw = draft, syncDraft = true) => {
     const n = parseFloat(raw);
-    if (Number.isFinite(n)) onChange(Math.max(min, +(n).toFixed(step < 1 ? 1 : 0)));
+    if (Number.isFinite(n)) {
+      const fixed = step < 1 || String(raw).includes(".") ? 1 : 0;
+      const next = Math.max(min, +(n).toFixed(fixed));
+      onChange(next);
+      if (syncDraft) setDraft(fmt(next));
+      return true;
+    } else {
+      if (syncDraft) setDraft(fmt(value));
+      return false;
+    }
   };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: big ? 16 : 8 }}>
       <button className="step-btn" onClick={() => onChange(Math.max(min, +(value - step).toFixed(1)))}><Minus size={big ? 22 : 16} /></button>
       <div className="step-value" style={{ minWidth: big ? 150 : 70 }}>
         <input
-          type="number"
+          type="text"
           inputMode="decimal"
-          min={min}
-          step={step}
-          value={fmt(value)}
-          onChange={(e) => parse(e.target.value)}
+          value={draft}
+          onChange={(e) => {
+            const next = e.target.value.replace(/[^\d.]/g, "");
+            setDraft(next);
+            if (next && !next.endsWith(".")) applyDraft(next, false);
+          }}
+          onBlur={() => applyDraft()}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
           onFocus={(e) => e.target.select()}
           aria-label={suffix ? `${suffix}を入力` : "数値を入力"}
           style={{ fontSize: big ? 52 : 24, width: big ? 110 : 54 }}
