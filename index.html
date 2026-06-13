@@ -328,15 +328,26 @@ function SectionLabel({ children, right }) {
 
 function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
   const fmt = (v) => (step < 1 ? v.toFixed(1) : String(v));
+  const parse = (raw) => {
+    const n = parseFloat(raw);
+    if (Number.isFinite(n)) onChange(Math.max(min, +(n).toFixed(step < 1 ? 1 : 0)));
+  };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: big ? 16 : 8 }}>
       <button className="step-btn" onClick={() => onChange(Math.max(min, +(value - step).toFixed(1)))}><Minus size={big ? 22 : 16} /></button>
-      <div style={{
-        fontFamily: "'Oswald',sans-serif", fontSize: big ? 52 : 24, fontWeight: 600,
-        color: C.ink, minWidth: big ? 150 : 70, textAlign: "center", fontVariantNumeric: "tabular-nums",
-        letterSpacing: "-0.01em",
-      }}>
-        {fmt(value)}<span style={{ fontSize: big ? 18 : 12, color: C.inkSub, marginLeft: 5, fontFamily: "inherit" }}>{suffix}</span>
+      <div className="step-value" style={{ minWidth: big ? 150 : 70 }}>
+        <input
+          type="number"
+          inputMode="decimal"
+          min={min}
+          step={step}
+          value={fmt(value)}
+          onChange={(e) => parse(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          aria-label={suffix ? `${suffix}を入力` : "数値を入力"}
+          style={{ fontSize: big ? 52 : 24, width: big ? 110 : 54 }}
+        />
+        <span style={{ fontSize: big ? 18 : 12 }}>{suffix}</span>
       </div>
       <button className="step-btn" onClick={() => onChange(+(value + step).toFixed(1))}><Plus size={big ? 22 : 16} /></button>
     </div>
@@ -1377,6 +1388,18 @@ button { font-family: inherit; cursor: pointer; }
   color: ${C.ink}; display: flex; align-items: center; justify-content: center; transition: transform .1s, border-color .1s;
 }
 .step-btn:active { transform: scale(0.9); border-color: ${C.strokeHi}; }
+
+.step-value { display: flex; align-items: baseline; justify-content: center; gap: 5px; }
+.step-value input {
+  appearance: textfield; -moz-appearance: textfield;
+  background: transparent; border: 1px solid transparent; border-radius: 10px;
+  color: ${C.ink}; font-family: 'Oswald', sans-serif; font-weight: 600;
+  text-align: center; font-variant-numeric: tabular-nums; outline: none; padding: 2px 4px;
+}
+.step-value input::-webkit-outer-spin-button,
+.step-value input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.step-value input:focus { border-color: ${C.strokeHi}; background: rgba(255,255,255,0.04); }
+.step-value span { color: ${C.inkSub}; font-family: 'Oswald', sans-serif; }
 
 .icon-btn { background: none; border: none; color: ${C.inkSub}; padding: 6px; border-radius: 8px; display: flex; }
 .icon-btn:disabled { opacity: 0.3; }
