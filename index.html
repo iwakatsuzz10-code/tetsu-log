@@ -483,7 +483,8 @@ function BarTrendSvg({ data, valueKey, labelKey, height = 130, color = C.violet,
 }
 
 function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
-  const fmt = (v) => (step < 1 ? v.toFixed(1) : String(v));
+  const isBlank = (v) => v === "" || v === null || v === undefined || !Number.isFinite(Number(v));
+  const fmt = (v) => isBlank(v) ? "" : (step < 1 ? Number(v).toFixed(1) : String(v));
   const [draft, setDraft] = useState(fmt(value));
   useEffect(() => { setDraft(fmt(value)); }, [value, step]);
   const applyDraft = (raw = draft, syncDraft = true) => {
@@ -495,13 +496,14 @@ function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
       if (syncDraft) setDraft(fmt(next));
       return true;
     } else {
-      if (syncDraft) setDraft(fmt(value));
+      if (syncDraft) setDraft("");
       return false;
     }
   };
+  const current = isBlank(value) ? min : Number(value);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: big ? 16 : 8 }}>
-      <button className="step-btn" onClick={() => onChange(Math.max(min, +(value - step).toFixed(1)))}><Minus size={big ? 22 : 16} /></button>
+      <button className="step-btn" onClick={() => onChange(Math.max(min, +(current - step).toFixed(1)))}><Minus size={big ? 22 : 16} /></button>
       <div className="step-value" style={{ minWidth: big ? 150 : 70 }}>
         <input
           type="text"
@@ -516,11 +518,12 @@ function Stepper({ value, onChange, step = 1, min = 0, suffix, big }) {
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
           onFocus={(e) => e.target.select()}
           aria-label={suffix ? `${suffix}を入力` : "数値を入力"}
+          placeholder="--"
           style={{ fontSize: big ? 52 : 24, width: big ? 110 : 54 }}
         />
         <span style={{ fontSize: big ? 18 : 12 }}>{suffix}</span>
       </div>
-      <button className="step-btn" onClick={() => onChange(+(value + step).toFixed(1))}><Plus size={big ? 22 : 16} /></button>
+      <button className="step-btn" onClick={() => onChange(+(current + step).toFixed(1))}><Plus size={big ? 22 : 16} /></button>
     </div>
   );
 }
@@ -901,10 +904,8 @@ function WorkoutTab({ data, commit }) {
   const lastOf = (ex) => [...data.workouts].reverse().find((w) => w.exercise === ex);
   const startExercise = (ex) => {
     setExercise(ex);
-    const last = lastOf(ex);
-    const mode = exerciseMeta(ex).mode;
-    setSets(last ? last.sets.map((s) => normalizeSet(s, mode)) : [defaultSetFor(ex)]);
-    setEffort(last?.effort || "good");
+    setSets([defaultSetFor(ex)]);
+    setEffort("good");
     setNote("");
     setDate(todayStr());
   };
@@ -1137,9 +1138,9 @@ function WorkoutTab({ data, commit }) {
 
 function WeightTab({ data, commit }) {
   const sorted = [...data.weights].sort((a, b) => a.date.localeCompare(b.date));
-  const latest = sorted.length ? sorted[sorted.length - 1].kg : 65.0;
-  const [kg, setKg] = useState(latest);
   const [date, setDate] = useState(todayStr());
+  const todayWeightEntry = data.weights.find((w) => w.date === todayStr());
+  const [kg, setKg] = useState(todayWeightEntry ? todayWeightEntry.kg : "");
   const [goalInput, setGoalInput] = useState(data.profile.goalWeight ?? "");
   const [editing, setEditing] = useState(false);
 
@@ -1147,11 +1148,13 @@ function WeightTab({ data, commit }) {
   const isPast = date !== todayStr();
 
   const save = () => {
+    const numericKg = parseFloat(kg);
+    if (!Number.isFinite(numericKg) || numericKg <= 0) return;
     const others = data.weights.filter((w) => w.date !== date);
     const isNew = !existingForDate;
     // XPは「今日」かつ新規のみ付与（過去日埋めはXPなし=不正防止）
     const xpGain = (isNew && !isPast) ? 10 : 0;
-    const weights = [...others, { date, kg }].sort((a, b) => a.date.localeCompare(b.date));
+    const weights = [...others, { date, kg: numericKg }].sort((a, b) => a.date.localeCompare(b.date));
     // startWeightを最古の記録に同期
     const profile = { ...data.profile, startWeight: weights[0]?.kg ?? null };
     commit({ ...data, weights, profile, xp: data.xp + xpGain }, xpGain);
@@ -1172,17 +1175,17 @@ function WeightTab({ data, commit }) {
       <Panel glow="rgba(95,212,154,0.18)" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "22px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Calendar size={15} color={C.inkSub} />
-          <input type="date" className="date-input" value={date} max={todayStr()} onChange={(e) => { setDate(e.target.value); const ex = data.weights.find((w) => w.date === e.target.value); setKg(ex ? ex.kg : latest); }} />
+          <input type="date" className="date-input" value={date} max={todayStr()} onChange={(e) => { setDate(e.target.value); const ex = data.weights.find((w) => w.date === e.target.value); setKg(ex ? ex.kg : ""); }} />
           {isPast && <span className="past-tag">過去日</span>}
         </div>
         <Eyebrow color={existingForDate ? C.brass : C.inkSub}>{existingForDate ? "記録を上書き" : "新規記録"}</Eyebrow>
         <Stepper value={kg} step={0.1} suffix="kg" big onChange={setKg} />
         <div style={{ display: "flex", gap: 8 }}>
           {[-0.5, -0.1, +0.1, +0.5].map((d) => (
-            <button key={d} className="quick-chip" onClick={() => setKg(+(kg + d).toFixed(1))}>{d > 0 ? `+${d}` : d}</button>
+            <button key={d} className="quick-chip" disabled={!Number.isFinite(Number(kg))} onClick={() => setKg(+(Number(kg) + d).toFixed(1))}>{d > 0 ? `+${d}` : d}</button>
           ))}
         </div>
-        <button className="primary-btn big" style={{ width: "100%", background: `linear-gradient(135deg, ${C.jade}, #8FE6BD)`, color: "#06251A", boxShadow: "0 4px 16px rgba(95,212,154,0.25)" }} onClick={save}>
+        <button className="primary-btn big" disabled={!Number.isFinite(Number(kg)) || Number(kg) <= 0} style={{ width: "100%", background: `linear-gradient(135deg, ${C.jade}, #8FE6BD)`, color: "#06251A", boxShadow: "0 4px 16px rgba(95,212,154,0.25)" }} onClick={save}>
           <Zap size={18} fill="#06251A" /> {existingForDate ? "上書きする" : (isPast ? "過去の記録を追加" : "記録する（+10 XP）")}
         </button>
       </Panel>
