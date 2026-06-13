@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#0E1014" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="LINEA" />
 <title>LINEA — 体の変化を記録する</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="icon" href="data:," />
@@ -145,6 +148,13 @@ const EXERCISE_META = {
   "アブローラー": { mode: "reps", start: { reps: 8 }, unit: "回" },
 };
 
+const EFFORTS = [
+  { id: "easy", label: "軽い", color: C.jade },
+  { id: "good", label: "効いた", color: C.brass },
+  { id: "hard", label: "きつい", color: C.emberSoft },
+  { id: "limit", label: "限界", color: C.ember },
+];
+
 const BADGES = [
   { id: "first", name: "はじめの一歩", desc: "初めて記録した", icon: "🔥", check: (d) => totalLogs(d) >= 1 },
   { id: "streak3", name: "三日坊主卒業", desc: "3日連続で記録", icon: "🗓️", check: (d) => calcStreak(d) >= 3 },
@@ -208,6 +218,7 @@ const formatWorkoutSets = (workout) => {
   const mode = workout.mode || exerciseMeta(workout.exercise).mode;
   return workout.sets.map((s) => formatSet(s, mode)).join(" / ");
 };
+const effortInfo = (id) => EFFORTS.find((e) => e.id === id) || EFFORTS[1];
 const workoutPrimaryMetric = (workout) => {
   const mode = workout.mode || exerciseMeta(workout.exercise).mode;
   if (mode === "timed") {
@@ -273,6 +284,14 @@ function todaySummary(data) {
     sets: totalSets(workouts),
     photo: (data.photos || []).find((p) => p.date === today),
   };
+}
+
+function nextActionFor(data) {
+  const s = todaySummary(data);
+  if (!s.weight) return { label: "体重を記録", sub: "朝でも夜でも、同じタイミングで残す", tab: "weight", icon: Scale, color: C.jade };
+  if (!s.workouts.length) return { label: "1種目だけ記録", sub: "軽くても、続いた日として残す", tab: "workout", icon: Dumbbell, color: C.ember };
+  if (!s.photo) return { label: "体ラインを残す", sub: "数字では見えない変化を拾う", tab: "photos", icon: Camera, color: C.violet };
+  return { label: "今日は完了", sub: "体重・トレ・写真がそろっています", tab: "stats", icon: Check, color: C.brass };
 }
 
 function compressImage(file, maxSide = 960, quality = 0.78) {
@@ -575,6 +594,8 @@ function HomeTab({ data, lv, goTab, commit }) {
   const latestWeight = data.weights.length ? data.weights[data.weights.length - 1] : null;
   const goal = data.profile.goalWeight;
   const completed = [todayWeight, todayWorkouts.length > 0, todayPhoto].filter(Boolean).length;
+  const next = nextActionFor(data);
+  const NextIcon = next.icon;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -618,6 +639,18 @@ function HomeTab({ data, lv, goTab, commit }) {
           <div style={{ fontSize: 11, color: todayWeight ? C.jade : C.inkSub, marginTop: 2 }}>{todayWeight ? "今日 計測済み ✓" : "今日は未計測"}</div>
         </Panel>
       </div>
+
+      <Panel glow={`${next.color}22`} onClick={() => goTab(next.tab)} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 46, height: 46, borderRadius: 14, background: `${next.color}18`, display: "flex", alignItems: "center", justifyContent: "center", color: next.color }}>
+          <NextIcon size={22} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Eyebrow color={next.color}>Next</Eyebrow>
+          <div style={{ fontSize: 18, fontWeight: 900, marginTop: 3 }}>{next.label}</div>
+          <div style={{ fontSize: 12, color: C.inkSub, marginTop: 3 }}>{next.sub}</div>
+        </div>
+        <ChevronRight size={18} color={C.dim} />
+      </Panel>
 
       <Panel glow={completed === 3 ? "rgba(95,212,154,0.18)" : "rgba(230,180,80,0.12)"}>
         <SectionLabel right={<span style={{ fontSize: 11, color: completed === 3 ? C.jade : C.brass, fontWeight: 800 }}>{completed}/3</span>}>今日の記録</SectionLabel>
@@ -672,11 +705,15 @@ function HomeTab({ data, lv, goTab, commit }) {
                   <span style={{ fontSize: 11, color: C.ember, fontWeight: 800, marginRight: 8 }}>{w.muscle}</span>
                   <span style={{ fontWeight: 700 }}>{w.exercise}</span>
                   <div style={{ fontSize: 12, color: C.inkSub, marginTop: 2 }}>{formatWorkoutSets(w)}</div>
+                  {w.note && <div style={{ fontSize: 11, color: C.inkSub, marginTop: 4 }}>{w.note}</div>}
                 </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                {w.effort && <span className="effort-pill" style={{ color: effortInfo(w.effort).color, borderColor: `${effortInfo(w.effort).color}66`, background: `${effortInfo(w.effort).color}14` }}>{effortInfo(w.effort).label}</span>}
                 {(() => {
                   const metric = workoutPrimaryMetric(w);
                   return <div style={{ fontFamily: "'Oswald',sans-serif", fontWeight: 600, color: C.brass }}>{metric.value}<span style={{ fontSize: 10, color: C.inkSub }}>{metric.suffix}</span></div>;
                 })()}
+                </div>
               </Panel>
             ))}
           </div>
@@ -693,6 +730,8 @@ function WorkoutTab({ data, commit }) {
   const [exercise, setExercise] = useState(null);
   const [sets, setSets] = useState([{ weight: 40, reps: 10 }]);
   const [date, setDate] = useState(todayStr());
+  const [effort, setEffort] = useState("good");
+  const [note, setNote] = useState("");
 
   const lastOf = (ex) => [...data.workouts].reverse().find((w) => w.exercise === ex);
   const startExercise = (ex) => {
@@ -700,6 +739,8 @@ function WorkoutTab({ data, commit }) {
     const last = lastOf(ex);
     const mode = exerciseMeta(ex).mode;
     setSets(last ? last.sets.map((s) => normalizeSet(s, mode)) : [defaultSetFor(ex)]);
+    setEffort(last?.effort || "good");
+    setNote("");
     setDate(todayStr());
   };
 
@@ -708,9 +749,10 @@ function WorkoutTab({ data, commit }) {
     const normalized = sets.map((s) => normalizeSet(s, mode));
     const volume = mode === "weighted" ? normalized.reduce((s, x) => s + x.weight * x.reps, 0) : 0;
     const xpGain = 15 + sets.length * 5;
-    const entry = { id: Date.now(), date, exercise, muscle, mode, sets: normalized, volume };
+    const entry = { id: Date.now(), date, exercise, muscle, mode, sets: normalized, volume, effort, note: note.trim() };
     commit({ ...data, workouts: [...data.workouts, entry], xp: data.xp + xpGain }, xpGain);
     setExercise(null);
+    setNote("");
   };
   const removeWorkout = (id) => commit({ ...data, workouts: data.workouts.filter((w) => w.id !== id) });
 
@@ -780,6 +822,19 @@ function WorkoutTab({ data, commit }) {
 
         <button className="ghost-btn" onClick={() => setSets([...sets, normalizeSet(sets[sets.length - 1], mode)])}><Plus size={16} /> セットを追加</button>
 
+        <Panel style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <SectionLabel>手応え</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            {EFFORTS.map((e) => (
+              <button key={e.id} className="effort-btn" onClick={() => setEffort(e.id)}
+                style={{ color: effort === e.id ? "#120D08" : e.color, borderColor: effort === e.id ? e.color : `${e.color}66`, background: effort === e.id ? e.color : `${e.color}12` }}>
+                {e.label}
+              </button>
+            ))}
+          </div>
+          <textarea className="note-input compact" placeholder="メモ：フォーム、痛み、パンプ感、次回の重量など" value={note} onChange={(e) => setNote(e.target.value)} />
+        </Panel>
+
         <Panel style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(168deg, ${C.panelHi}, ${C.panel})` }}>
           <span style={{ fontSize: 13, color: C.inkSub }}>{metric.label}</span>
           <span style={{ fontFamily: "'Oswald',sans-serif", fontSize: 30, fontWeight: 700, color: C.brass }}>{metric.value}<span style={{ fontSize: 13, color: C.inkSub }}> {metric.suffix}</span></span>
@@ -848,8 +903,10 @@ function WorkoutTab({ data, commit }) {
                   <span style={{ fontSize: 11, color: C.inkSub, marginRight: 8 }}>{fmtDate(w.date)}</span>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{w.exercise}</span>
                   <div style={{ fontSize: 11, color: C.inkSub }}>{formatWorkoutSets(w)}</div>
+                  {w.note && <div style={{ fontSize: 11, color: C.inkSub, marginTop: 3 }}>{w.note}</div>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {w.effort && <span className="effort-pill" style={{ color: effortInfo(w.effort).color, borderColor: `${effortInfo(w.effort).color}66`, background: `${effortInfo(w.effort).color}14` }}>{effortInfo(w.effort).label}</span>}
                   {(() => {
                     const metric = workoutPrimaryMetric(w);
                     return <span style={{ fontFamily: "'Oswald',sans-serif", color: C.brass, fontWeight: 600, fontSize: 14 }}>{metric.value}{metric.suffix}</span>;
@@ -1159,6 +1216,12 @@ function StatsTab({ data }) {
     return out;
   }, [data.workouts]);
 
+  const effortCounts = useMemo(() => {
+    const counts = {};
+    data.workouts.forEach((w) => { if (w.effort) counts[w.effort] = (counts[w.effort] || 0) + 1; });
+    return EFFORTS.map((e) => ({ ...e, count: counts[e.id] || 0 })).filter((e) => e.count > 0);
+  }, [data.workouts]);
+
   if (!hasW && data.workouts.length === 0 && photos.length === 0) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "60px 20px", textAlign: "center" }}>
@@ -1203,6 +1266,20 @@ function StatsTab({ data }) {
             <span style={{ fontSize: 13, color: C.inkSub }}>shots</span>
           </div>
         </Panel>
+      )}
+
+      {effortCounts.length > 0 && (
+        <div>
+          <SectionLabel>トレーニングの手応え</SectionLabel>
+          <Panel style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            {effortCounts.map((e) => (
+              <div key={e.id} style={{ textAlign: "center", border: `1px solid ${e.color}55`, background: `${e.color}10`, borderRadius: 12, padding: "12px 6px" }}>
+                <div style={{ color: e.color, fontWeight: 900, fontSize: 13 }}>{e.label}</div>
+                <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 24, fontWeight: 700, marginTop: 3 }}>{e.count}</div>
+              </div>
+            ))}
+          </Panel>
+        </div>
       )}
 
       {/* 移動平均トレンド */}
@@ -1434,6 +1511,17 @@ button { font-family: inherit; cursor: pointer; }
   color: ${C.inkSub}; border-radius: 999px; padding: 7px 13px; font-size: 12px;
 }
 
+.effort-btn {
+  border: 1px solid; border-radius: 12px; padding: 10px 6px;
+  font-weight: 900; font-size: 12px; transition: transform .12s, filter .12s;
+}
+.effort-btn:active { transform: scale(0.96); filter: brightness(1.08); }
+.effort-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid; border-radius: 999px; padding: 3px 8px;
+  font-size: 10px; font-weight: 900; white-space: nowrap;
+}
+
 .quick-chip {
   background: linear-gradient(168deg, ${C.panelHi}, #1B202A); border: 1px solid ${C.stroke};
   color: ${C.ink}; border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums;
@@ -1464,6 +1552,7 @@ button { font-family: inherit; cursor: pointer; }
   color: ${C.ink}; padding: 12px; font-size: 14px; line-height: 1.5; font-family: inherit; outline: none;
 }
 .note-input:focus { border-color: ${C.violet}; }
+.note-input.compact { min-height: 62px; margin-top: 0; }
 
 .photo-frame {
   position: relative; width: 100%; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 12px;
